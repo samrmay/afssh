@@ -3,12 +3,13 @@ import random as rand
 
 
 class AFSSH():
-    def __init__(self, model, r0, v0, dt_c, dt_q, coeff=None, mass=2000, t0=0, state0=0, seed=None):
+    def __init__(self, model, r0, v0, dt_c, dt_q, e_tol=1e-6, coeff=None, mass=2000, t0=0, state0=0, seed=None):
         self.model = model
         self.m = mass
         self.lam = state0
         self.dt_c = dt_c
         self.dt_q = dt_q
+        self.e_tol = e_tol
 
         # Bookkeeping variables
         self.debug = False
@@ -51,10 +52,10 @@ class AFSSH():
         # Initialize constants
         self.HBAR = 1
 
-    def calc_traj(self, r0, v0, del_t, m):
+    def calc_traj(self, r0, v0, del_t, m, a0=None):
         """
         Propagates position, velocity using velocity Verlet algorithm (with half step velocity).
-        Uses self.a as the inital a0. If None, calculate at t0.
+        If a == None, calculate a0 from model
         Uses self.lam for current PES
 
         Returns:
@@ -62,10 +63,8 @@ class AFSSH():
             v: new velocity at time t0 + del_t
             a: new acceleration at time t0 + del_t
         """
-        if self.a == None:
+        if a0 == None:
             a0 = self.model.get_d_adiabatic_energy(r0)[self.lam]/m
-        else:
-            a0 = self.a
 
         half_v = v0 + .5*a0*del_t
         r = r0 + (half_v)*del_t
@@ -73,3 +72,12 @@ class AFSSH():
         v = half_v + .5*a*del_t
 
         return r, v, a
+
+    def step(self):
+        # Nuclear classical evolution
+        r0 = self.r
+        v0 = self.v
+        a0 = self.a
+        r, v, a = self.calc_traj(r0, v0, self.dt_c, self.m, a0=a0)
+
+        # Calculate overlap matrix
