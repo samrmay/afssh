@@ -6,7 +6,7 @@ class AFSSH():
     def __init__(self, model, r0, v0, dt_c, dt_q, coeff=None, mass=2000, t0=0, state0=0, seed=None):
         self.model = model
         self.m = mass
-        self.e_state = state0
+        self.lam = state0
         self.dt_c = dt_c
         self.dt_q = dt_q
 
@@ -40,9 +40,36 @@ class AFSSH():
         else:
             self.r = r0
             self.v = v0
+
+        # Track acceleration to save time when calculating trajectory
+        self.a = None
+
         # Initialize seed if given
         if seed != None:
             rand.seed(seed)
 
         # Initialize constants
         self.HBAR = 1
+
+    def calc_traj(self, r0, v0, del_t, m):
+        """
+        Propagates position, velocity using velocity Verlet algorithm (with half step velocity).
+        Uses self.a as the inital a0. If None, calculate at t0.
+        Uses self.lam for current PES
+
+        Returns:
+            r: new position at time t0 + del_t
+            v: new velocity at time t0 + del_t
+            a: new acceleration at time t0 + del_t
+        """
+        if self.a == None:
+            a0 = self.model.get_d_adiabatic_energy(r0)[self.lam]/m
+        else:
+            a0 = self.a
+
+        half_v = v0 + .5*a0*del_t
+        r = r0 + (half_v)*del_t
+        a = self.model.get_d_adiabatic_energy(r)[self.lam]/m
+        v = half_v + .5*a*del_t
+
+        return r, v, a
