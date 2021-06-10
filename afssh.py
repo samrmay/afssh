@@ -134,6 +134,11 @@ class AFSSH():
         result = integrate.solve_ivp(f, (t0, t1), self.coeff)
         return result.y[:, -1]
 
+    def calc_hop_probabilities(self, coeff, t_mtx, dt_q, lam):
+        c_vec = coeff/coeff[lam]
+        t_vec = t_mtx[:, lam]
+        return -2*dt_q*(c_vec*t_vec).real
+
     def step(self):
         dt_c = self.dt_c
         t0 = self.t
@@ -164,8 +169,25 @@ class AFSSH():
         u1 = self.model.get_adiabatic_energy(r)
         def u_interp(t): return u0 + ((t - t0)/(dt_c))*(u1-u0)
         c0 = self.coeff
+        hop_attempted = False
+        new_PES = self.lam
 
         for k in range(1, n_q + 1):
             t1 = t0 + (k-1)*dt_q
             t2 = t0 + k*dt_q
             c = self.calc_coeff(t1, t2, u_interp, t_mid, c0)
+
+            if not hop_attempted:
+                hop_vector = self.calc_hop_probabilities(
+                    c, t_mid, dt_q, self.lam)
+                delta = rand.random()
+
+                for i in range(self.num_states):
+                    if delta[i] > hop_vector[i] and i != self.lam:
+                        hop_attempted = True
+                        new_PES = i
+                        break
+
+            c0 = c
+
+        self.coeff = c
