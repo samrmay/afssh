@@ -6,8 +6,8 @@ class Diabatic_Model:
         self.num_states = num_states
         self.dim = dim
 
-    def get_adiabatic(self, x):
-        v, ev = np.linalg.eig(self.V(x))
+    def get_adiabatic(self, x, correction=0):
+        v, ev = np.linalg.eig(self.V(x) + correction)
         d = {}
         for i in range(len(v)):
             d[v[i]] = ev[:, i]
@@ -19,11 +19,11 @@ class Diabatic_Model:
 
         return v_sorted, ev_sorted
 
-    def get_adiabatic_energy(self, x):
-        return self.get_adiabatic(x)[0]
+    def get_adiabatic_energy(self, x, correction=0):
+        return self.get_adiabatic(x, correction)[0]
 
-    def get_wave_function(self, x):
-        return self.get_adiabatic(x)[1]
+    def get_wave_function(self, x, correction=0):
+        return self.get_adiabatic(x, correction)[1]
 
     def get_d_adiabatic_energy(self, x, step=0.00001):
         grad_v = np.zeros((self.num_states, self.dim))
