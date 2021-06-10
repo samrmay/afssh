@@ -9,12 +9,11 @@ class AFSSH():
     Closely follows http://dx.doi.org/10.1021/acs.jctc.6b00673 and equation references are from this paper
     """
 
-    def __init__(self, model, r0, v0, dt_c, dt_q, e_tol=1e-6, coeff=None, mass=2000, t0=0, state0=0, seed=None):
+    def __init__(self, model, r0, v0, dt_c, e_tol=1e-6, coeff=None, mass=2000, t0=0, state0=0, seed=None):
         self.model = model
         self.m = mass
         self.lam = state0
         self.dt_c = dt_c
-        self.dt_q = dt_q
         self.e_tol = e_tol
 
         # Bookkeeping variables
@@ -109,6 +108,9 @@ class AFSSH():
         return u_mtx
 
     def calc_t_mtx(self, u_mtx, d_tc):
+        """
+        Calculate time density mtx. at d_tc/2 using eq. 29 and a proper U mtx.
+        """
         return (1/d_tc)*linalg.logm(u_mtx)
 
     def step(self):
@@ -124,3 +126,12 @@ class AFSSH():
         # Calculate overlap matrix and time density mtx
         u_mtx = self.calc_overlap_mtx(dt_c)
         t_mid = self.calc_t_mtx(u_mtx, dt_c)
+
+        # Determine dt_q (eq. 20, 21)
+        v = self.model.get_adiabatic_energy((r + r0)/2)
+        dt_q_prime = min(dt_c, .02/np.max(np.absolute(t_mid)))
+        # Check that V here is correct (using V at x0)
+        dt_q_prime = min(dt_q_prime, .02*self.H_BAR /
+                         np.max(np.absolute(v - np.average(v))))
+
+        dt_q = dt_c/int(round(dt_c/dt_q_prime))
