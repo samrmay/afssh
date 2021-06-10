@@ -1,6 +1,7 @@
 import numpy as np
 import random as rand
 import scipy.linalg as linalg
+import scipy.integrate as integrate
 
 
 class AFSSH():
@@ -15,11 +16,11 @@ class AFSSH():
         self.lam = state0
         self.dt_c = dt_c
         self.e_tol = e_tol
+        self.t = t0
 
         # Bookkeeping variables
         self.debug = False
         self.i = 0
-        self.t = t0
         # Track switches with dict {old_state, new_state, position, delta_v, nacv, success}
         self.switches = []
 
@@ -113,9 +114,29 @@ class AFSSH():
         """
         return (1/d_tc)*linalg.logm(u_mtx)
 
+    def calc_coeff(self, t0, t1, V, T, coeff0):
+        """
+        Calculate quantum coefficients (eq. 11)
+
+        Parameters:
+            t0 (int): initial time
+            t1 (int): end time
+            V (func): function that takes in single argument t and returns potential matrix at time t. 
+            Paper suggests linear interpolation between potential at times t0 and t1
+            T (iterable): time derivative matrix
+            coeff0: intial coefficients at time t0
+        """
+        def f(t, c):
+            energy = V(t)
+            summation = np.sum(T*np.tile(c, (self.num_states, 1)), axis=1)
+            return (energy*c - summation)/(1j*self.HBAR)
+
+        result = integrate.solve_ivp(f, (t0, t1), self.coeff)
+        return result.y[:, -1]
+
     def step(self):
-        # Initialize time steps (may change depending on energy conservation)
         dt_c = self.dt_c
+        t0 = self.t
 
         # Nuclear classical evolution using classical time step dt_c
         r0 = self.r
@@ -128,10 +149,23 @@ class AFSSH():
         t_mid = self.calc_t_mtx(u_mtx, dt_c)
 
         # Determine dt_q (eq. 20, 21)
-        v = self.model.get_adiabatic_energy((r + r0)/2)
+        u = self.model.get_adiabatic_energy((r + r0)/2)
         dt_q_prime = min(dt_c, .02/np.max(np.absolute(t_mid)))
         # Check that V here is correct (using V at x0)
-        dt_q_prime = min(dt_q_prime, .02*self.H_BAR /
-                         np.max(np.absolute(v - np.average(v))))
+        dt_q_prime = min(dt_q_prime, .02*self.HBAR /
+                         np.max(np.absolute(u - np.average(u))))
 
         dt_q = dt_c/int(round(dt_c/dt_q_prime))
+
+        # Carry out quantum time steps from t0 -> t0 + dt_c by dt_q
+        # T is constant, V is varied linearly from u0, u1
+        n_q = int(dt_c/dt_q)
+        u0 = self.model.get_adiabatic_energy(r0)
+        u1 = self.model.get_adiabatic_energy(r)
+        def u_interp(t): return u0 + ((t - t0)/(dt_c))*(u1-u0)
+        c0 = self.coeff
+
+        for k in range(1, n_q + 1):
+            t1 = t0 + (k-1)*dt_q
+            t2 = t0 + k*dt_q
+            c = self.calc_coeff(t1, t2, u_interp, t_mid, c0)
