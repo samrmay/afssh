@@ -2,6 +2,16 @@ import numpy as np
 import random as rand
 import scipy.linalg as linalg
 import scipy.integrate as integrate
+import math as math
+
+
+def mag(v):
+    return np.sqrt(np.sum(np.square(v)))
+
+
+def quadratic(a, b, c):
+    p2 = math.sqrt((b**2) - 4*a*c)
+    return (-b + p2)/2/a, (-b - p2)/2/a
 
 
 class AFSSH():
@@ -201,8 +211,8 @@ class AFSSH():
 
         # Check energy conservation (if applicable)
         if self.e_tol != None:
-            energy0 = u0 + self.calc_KE(v0)
-            energy1 = u1 + self.calc_KE(v)
+            energy0 = u0[self.lam] + self.calc_KE(v0)
+            energy1 = u1[self.lam] + self.calc_KE(v)
             if abs(energy1 - energy0) > self.e_tol and hop_attempted:
                 # If above energy tolerance, use eq. 22 to update v
                 F0 = -self.model.get_d_adiabatic_energy(r0)[self.lam]
@@ -210,7 +220,7 @@ class AFSSH():
                 v = v0 + (1/2/self.m)*dt_c*F0 + F1
 
                 # Check if this conserves energy. If so, no need to adjust velocity
-                energy_new = self.get_adiabatic_energy(r)[new_PES]
+                energy_new = u1[new_PES] + self.calc_KE(v)
                 if abs(energy_new - energy0) < self.e_tol:
                     self.r = r
                     self.v = v
@@ -219,8 +229,44 @@ class AFSSH():
                     self.lam = new_PES
                     self.delta_R = 0
                     self.delta_P = 0
+                    self.t += dt_c
                     return True
 
             # If energy not conserved using force of hopped surface (or no hop attempted),
             # retry algorithm with smaller step size
             return False
+
+        # Adjust velocity if necessary
+        if hop_attempted:
+            diff = u1[new_PES] - u1[self.lam]
+            ev = self.model.get_wave_function(r)
+            d_ev = self.model.get_d_wave_functions(r)
+            dlj = ev[:, self.lam]@d_ev[:, new_PES]
+
+            if self.calc_KE(v) <= diff:
+                # Frustrated hop
+                F = self.model.get_d_adiabatic_energy(r)
+                check1 = np.dot(F[self.lam], dlj)*np.dot(F[new_PES], dlj) < 0
+                check2 = np.dot(F[new_PES], dlj)*np.dot(r, dlj) < 0
+                if check1 and check2:
+                    correction = -np.sum(v0*dlj)/np.sum(np.square(dlj))
+                    v = v0 + correction
+            else:
+                # Carry out correction and set moments to 0
+                self.lam = new_PES
+                self.lam = new_PES
+                c_a = np.sum(np.square(dlj))
+                c_b = np.sum(2*dlj*v0)
+                c_c = (2/self.m)*diff
+                factors = quadratic(c_a, c_b, c_c)
+
+                correction = factors[0]*dlj
+                if correction > 0 and diff > 0:
+                    correction = factors[1]*dlj
+
+                v = v0 + correction
+                self.delta_R = 0
+                self.delta_P = 0
+
+    def run(self, max_iter, stopping_fcn):
+        pass
