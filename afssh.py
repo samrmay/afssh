@@ -48,6 +48,10 @@ class AFSSH():
             self.r = r0
             self.v = v0
 
+        # Initialize moments of position and velocity for decoherence
+        self.delta_R = 0
+        self.delta_P = 0
+
         # Track acceleration to save time when calculating trajectory
         self.a = None
 
@@ -58,7 +62,7 @@ class AFSSH():
         # Initialize constants
         self.HBAR = 1
 
-    def calc_traj(self, r0, v0, del_t, m, a0=None):
+    def calc_traj(self, r0, v0, del_t, a0=None):
         """
         Propagates position, velocity using velocity Verlet algorithm (with half step velocity).
         If a == None, calculate a0 from model
@@ -70,11 +74,11 @@ class AFSSH():
             a: new acceleration at time t0 + del_t
         """
         if a0 == None:
-            a0 = self.model.get_d_adiabatic_energy(r0)[self.lam]/m
+            a0 = -self.model.get_d_adiabatic_energy(r0)[self.lam]/self.m
 
         half_v = v0 + .5*a0*del_t
         r = r0 + (half_v)*del_t
-        a = self.model.get_d_adiabatic_energy(r)[self.lam]/m
+        a = -self.model.get_d_adiabatic_energy(r)[self.lam]/self.m
         v = half_v + .5*a*del_t
 
         return r, v, a
@@ -137,7 +141,11 @@ class AFSSH():
     def calc_hop_probabilities(self, coeff, t_mtx, dt_q, lam):
         c_vec = coeff/coeff[lam]
         t_vec = t_mtx[:, lam]
-        return -2*dt_q*(c_vec*t_vec).real
+        result = -2*dt_q*(c_vec*t_vec).real
+        return np.max(result, np.zeros(len(c_vec)))
+
+    def calc_KE(self, v):
+        return .5*self.m*(v**2)
 
     def step(self):
         dt_c = self.dt_c
@@ -182,12 +190,37 @@ class AFSSH():
                     c, t_mid, dt_q, self.lam)
                 delta = rand.random()
 
+                # Try to hop to any state
                 for i in range(self.num_states):
-                    if delta[i] > hop_vector[i] and i != self.lam:
+                    if delta[i] < hop_vector[i] and i != self.lam:
                         hop_attempted = True
                         new_PES = i
                         break
 
             c0 = c
 
-        self.coeff = c
+        # Check energy conservation (if applicable)
+        if self.e_tol != None:
+            energy0 = u0 + self.calc_KE(v0)
+            energy1 = u1 + self.calc_KE(v)
+            if abs(energy1 - energy0) > self.e_tol and hop_attempted:
+                # If above energy tolerance, use eq. 22 to update v
+                F0 = -self.model.get_d_adiabatic_energy(r0)[self.lam]
+                F1 = -self.model.get_d_adiabatic_energy(r)[new_PES]
+                v = v0 + (1/2/self.m)*dt_c*F0 + F1
+
+                # Check if this conserves energy. If so, no need to adjust velocity
+                energy_new = self.get_adiabatic_energy(r)[new_PES]
+                if abs(energy_new - energy0) < self.e_tol:
+                    self.r = r
+                    self.v = v
+                    self.a = a
+                    self.coeff = c
+                    self.lam = new_PES
+                    self.delta_R = 0
+                    self.delta_P = 0
+                    return True
+
+            # If energy not conserved using force of hopped surface (or no hop attempted),
+            # retry algorithm with smaller step size
+            return False
