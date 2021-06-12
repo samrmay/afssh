@@ -20,7 +20,7 @@ class AFSSH():
     Closely follows http://dx.doi.org/10.1021/acs.jctc.6b00673 and equation references are from this paper
     """
 
-    def __init__(self, model, r0, v0, dt_c, e_tol=1e-6, coeff=None, mass=2000, t0=0, state0=0, deco=True, seed=None):
+    def __init__(self, model, r0, v0, dt_c, e_tol=1e-6, coeff=None, mass=2000, t0=0, state0=0, deco=False, seed=None):
         self.model = model
         self.m = mass
         self.dt_c = dt_c
@@ -294,7 +294,7 @@ class AFSSH():
                 self.delta_P = 0
                 self.log_switch(self.lam, new_PES, r, v, c, diff)
 
-            # Propagate moments
+            # Decoherence calculations (unimplemented)
             if self.deco:
                 self.propagate_moments()
                 self.collapse_functions()
