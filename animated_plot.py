@@ -1,18 +1,11 @@
 import numpy as np
 import models as models
+import stopping_functions as fcns
 import matplotlib.pyplot as plt
 import matplotlib.animation as animation
 
 
-def f(fssh):
-    if fssh.r[0] > 6 and fssh.v[0] >= 0:
-        return True
-    elif fssh.r[0] < -6 and fssh.v[0] <= 0:
-        return True
-    return False
-
-
-def animate_1d(fssh, fig, ax, stopping_function=f, min_x=-10, max_x=10, interval=50, num_points=400):
+def animate_1d(fssh, fig, ax, stopping_function=fcns.f(-6, 6), min_x=-10, max_x=10, interval=50, num_points=400):
     x_linspace = np.linspace(min_x, max_x, num_points)
     model = fssh.model
     models.plot_1d(ax, model, x_linspace)
@@ -34,7 +27,7 @@ def animate_1d(fssh, fig, ax, stopping_function=f, min_x=-10, max_x=10, interval
     return ani
 
 
-def animate_2d(fssh, fig, ax, x_linspace, y_linspace, stopping_function=f, interval=50, num_points=400, colors=["black", "red"]):
+def animate_2d(fssh, fig, ax, x_linspace, y_linspace, stopping_function=fcns.f(-6, 6), interval=50, num_points=400, colors=["black", "red"]):
     model = fssh.model
     models.plot_2d(ax, model, x_linspace, y_linspace, colors)
 
