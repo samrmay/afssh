@@ -154,7 +154,7 @@ class AFSSH():
         return np.maximum(result, np.zeros(len(c_vec)))
 
     def calc_KE(self, v):
-        return .5*self.m*(v**2)
+        return .5*self.m*(mag(v)**2)
 
     def log_switch(self, state0, state1, r, v, c, delta_v, success=True):
         log = {
@@ -292,18 +292,18 @@ class AFSSH():
                 self.delta_P = 0
                 self.log_switch(self.lam, new_PES, r, v, c, diff)
 
-            # Decoherence calculations (unimplemented)
-            if self.deco:
-                self.propagate_moments()
-                self.collapse_functions()
+        # Decoherence calculations (unimplemented)
+        if self.deco:
+            self.propagate_moments()
+            self.collapse_functions()
 
-            # Update parameters
-            self.t += dt_c
-            self.v = v
-            self.r = r
-            self.a = a
-            self.coeff = c
-            return True
+        # Update parameters
+        self.t += dt_c
+        self.v = v
+        self.r = r
+        self.a = a
+        self.coeff = c
+        return True
 
     def run(self, max_iter, stopping_fcn, debug=False):
         for i in range(max_iter):
