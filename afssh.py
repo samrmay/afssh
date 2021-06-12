@@ -20,13 +20,14 @@ class AFSSH():
     Closely follows http://dx.doi.org/10.1021/acs.jctc.6b00673 and equation references are from this paper
     """
 
-    def __init__(self, model, r0, v0, dt_c, e_tol=1e-6, coeff=None, mass=2000, t0=0, state0=0, seed=None):
+    def __init__(self, model, r0, v0, dt_c, e_tol=1e-6, coeff=None, mass=2000, t0=0, state0=0, deco=True, seed=None):
         self.model = model
         self.m = mass
         self.lam = state0
         self.dt_c = dt_c
         self.e_tol = e_tol
         self.t = t0
+        self.deco = deco
 
         # Bookkeeping variables
         self.debug = False
@@ -145,7 +146,7 @@ class AFSSH():
             summation = np.sum(T*np.tile(c, (self.num_states, 1)), axis=1)
             return (energy*c - summation)/(1j*self.HBAR)
 
-        result = integrate.solve_ivp(f, (t0, t1), self.coeff)
+        result = integrate.solve_ivp(f, (t0, t1), coeff0)
         return result.y[:, -1]
 
     def calc_hop_probabilities(self, coeff, t_mtx, dt_q, lam):
@@ -156,6 +157,18 @@ class AFSSH():
 
     def calc_KE(self, v):
         return .5*self.m*(v**2)
+
+    def propagate_moments(self):
+        """
+        unimplemented
+        """
+        pass
+
+    def collapse_functions(self):
+        """
+        unimplemented
+        """
+        pass
 
     def step(self):
         dt_c = self.dt_c
@@ -268,5 +281,12 @@ class AFSSH():
                 self.delta_R = 0
                 self.delta_P = 0
 
+            # Propagate moments
+            if self.deco:
+                self.propagate_moments()
+                self.collapse_functions()
+
     def run(self, max_iter, stopping_fcn):
-        pass
+        for _ in range(max_iter):
+            if not self.step():
+                print("dt_c was too large (account for)")
