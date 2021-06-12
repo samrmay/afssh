@@ -23,20 +23,20 @@ class AFSSH():
     def __init__(self, model, r0, v0, dt_c, e_tol=1e-6, coeff=None, mass=2000, t0=0, state0=0, deco=True, seed=None):
         self.model = model
         self.m = mass
-        self.lam = state0
         self.dt_c = dt_c
-        self.e_tol = e_tol
         self.t = t0
-        self.deco = deco
 
         # Bookkeeping variables
         self.debug = False
         self.i = 0
-        # Track switches with dict {old_state, new_state, position, delta_v, nacv, success}
+        self.deco = deco
+        self.e_tol = e_tol
+        # Track switches with dict {old_state, new_state, position, coeff, delta_v, success}
         self.switches = []
 
         # Initialize electronic state
         self.num_states = model.num_states
+        self.lam = state0
         if state0 >= self.num_states:
             raise ValueError(
                 "ground state must be less than total number of states")
@@ -158,6 +158,18 @@ class AFSSH():
     def calc_KE(self, v):
         return .5*self.m*(v**2)
 
+    def log_switch(self, state0, state1, r, v, c, delta_v, success=True):
+        log = {
+            "old_state": state0,
+            "new_state": state1,
+            "position": r,
+            "velocity": v,
+            "coefficients": c,
+            "delta_v": delta_v,
+            "success": success
+        }
+        self.switches.append(log)
+
     def propagate_moments(self):
         """
         unimplemented
@@ -170,8 +182,7 @@ class AFSSH():
         """
         pass
 
-    def step(self):
-        dt_c = self.dt_c
+    def step(self, dt_c):
         t0 = self.t
 
         # Nuclear classical evolution using classical time step dt_c
@@ -239,6 +250,7 @@ class AFSSH():
                     self.v = v
                     self.a = a
                     self.coeff = c
+                    self.log_switch(self.lam, new_PES, r, v, c, 0)
                     self.lam = new_PES
                     self.delta_R = 0
                     self.delta_P = 0
@@ -264,6 +276,7 @@ class AFSSH():
                 if check1 and check2:
                     correction = -np.sum(v0*dlj)/np.sum(np.square(dlj))
                     v = v0 + correction
+                self.log_switch(self.lam, self.lam, r, v, c, diff, False)
             else:
                 # Carry out correction and set moments to 0
                 self.lam = new_PES
@@ -279,6 +292,7 @@ class AFSSH():
                 v = v0 + correction
                 self.delta_R = 0
                 self.delta_P = 0
+                self.log_switch(self.lam, new_PES, r, v, c, diff)
 
             # Propagate moments
             if self.deco:
@@ -293,7 +307,14 @@ class AFSSH():
             self.coeff = c
             return True
 
-    def run(self, max_iter, stopping_fcn):
-        for _ in range(max_iter):
-            if not self.step():
-                print("dt_c was too large (account for)")
+    def run(self, max_iter, stopping_fcn, debug=False):
+        for i in range(max_iter):
+            if not self.step(self.dt_c):
+                # Need to rerun step with smaller step size
+                self.step(int(self.dt_c/2))
+
+            if (self.debug and i % 100 == 0):
+                print(self.r, self.v, self.calc_KE(self.v))
+
+            if stopping_fcn(self):
+                return
