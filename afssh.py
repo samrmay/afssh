@@ -20,7 +20,7 @@ class AFSSH():
     Closely follows http://dx.doi.org/10.1021/acs.jctc.6b00673 and equation references are from this paper
     """
 
-    def __init__(self, model, r0, v0, dt_c, e_tol=1e-6, coeff=None, mass=2000, t0=0, state0=0, deco=False, seed=None):
+    def __init__(self, model, r0, v0, dt_c, e_tol=1e-3, coeff=None, mass=2000, t0=0, state0=0, deco=False, seed=None):
         self.model = model
         self.m = mass
         self.dt_c = dt_c
@@ -96,8 +96,8 @@ class AFSSH():
 
     def calc_overlap_mtx(self, r0, r1, correction=1e-6):
         # Calculate phi(t0) and phi(t0 + tau)
-        ev0 = self.model.get_wave_functions(r0)
-        ev1 = self.model.get_wave_functions(r1)
+        ev0 = self.model.get_wave_function(r0)
+        ev1 = self.model.get_wave_function(r1)
 
         # Calculate u_mtx, ensuring positive diagonal (eq. 5)
         def calc(ev0, ev1):
@@ -107,20 +107,18 @@ class AFSSH():
                     u_mtx[i, j] = ev0[:, i]@ev1[:, j]
             return u_mtx
         u_mtx = calc(ev0, ev1)
-
         if np.any(np.less(np.diag(u_mtx), np.zeros(self.num_states))):
             u_mtx = calc(-1*ev0, ev1)
 
         # Check for trivial crossing edge case and correct if necessary (eq. 30-33)
         if np.any(np.equal(u_mtx, np.zeros(self.num_states))):
-            adj_ev0 = self.model.get_wave_functions(r0, correction=correction)
-            adj_ev1 = self.model.get_wave_functions(r1, correction=correction)
-            print("0 IN U_MTX. UNHANDLED CASE")
+            adj_ev0 = self.model.get_wave_function(r0, correction=correction)
+            adj_ev1 = self.model.get_wave_function(r1, correction=correction)
+            raise Exception("0 IN U_MTX. UNHANDLED CASE")
             # ADD CORRECTION HERE
 
-        # Orthogonalize U (eq. 34) (Check if exponent is element wise)
-        u_mtx = u_mtx@((np.transpose(u_mtx)@u_mtx)**(-1/2))
-
+        # Orthogonalize U (eq. 34) (Make sure dont need to take inverse of this)
+        u_mtx = u_mtx@(linalg.sqrtm(np.transpose(u_mtx)@u_mtx))
         return u_mtx
 
     def calc_t_mtx(self, u_mtx, d_tc):
@@ -153,7 +151,7 @@ class AFSSH():
         c_vec = coeff/coeff[lam]
         t_vec = t_mtx[:, lam]
         result = -2*dt_q*(c_vec*t_vec).real
-        return np.max(result, np.zeros(len(c_vec)))
+        return np.maximum(result, np.zeros(len(c_vec)))
 
     def calc_KE(self, v):
         return .5*self.m*(v**2)
@@ -189,10 +187,10 @@ class AFSSH():
         r0 = self.r
         v0 = self.v
         a0 = self.a
-        r, v, a = self.calc_traj(r0, v0, dt_c, self.m, a0=a0)
+        r, v, a = self.calc_traj(r0, v0, dt_c, a0=a0)
 
         # Calculate overlap matrix and time density mtx
-        u_mtx = self.calc_overlap_mtx(dt_c)
+        u_mtx = self.calc_overlap_mtx(t0, t0 + dt_c)
         t_mid = self.calc_t_mtx(u_mtx, dt_c)
 
         # Determine dt_q (eq. 20, 21)
@@ -226,7 +224,7 @@ class AFSSH():
 
                 # Try to hop to any state
                 for i in range(self.num_states):
-                    if delta[i] < hop_vector[i] and i != self.lam:
+                    if delta < hop_vector[i] and i != self.lam:
                         hop_attempted = True
                         new_PES = i
                         break
@@ -237,29 +235,29 @@ class AFSSH():
         if self.e_tol != None:
             energy0 = u0[self.lam] + self.calc_KE(v0)
             energy1 = u1[self.lam] + self.calc_KE(v)
-            if abs(energy1 - energy0) > self.e_tol and hop_attempted:
-                # If above energy tolerance, use eq. 22 to update v
-                F0 = -self.model.get_d_adiabatic_energy(r0)[self.lam]
-                F1 = -self.model.get_d_adiabatic_energy(r)[new_PES]
-                v = v0 + (1/2/self.m)*dt_c*F0 + F1
+            if abs(energy1 - energy0) > self.e_tol:
+                if hop_attempted:
+                    # If above energy tolerance, use eq. 22 to update v
+                    F0 = -self.model.get_d_adiabatic_energy(r0)[self.lam]
+                    F1 = -self.model.get_d_adiabatic_energy(r)[new_PES]
+                    v = v0 + (1/2/self.m)*dt_c*F0 + F1
 
-                # Check if this conserves energy. If so, no need to adjust velocity
-                energy_new = u1[new_PES] + self.calc_KE(v)
-                if abs(energy_new - energy0) < self.e_tol:
-                    self.r = r
-                    self.v = v
-                    self.a = a
-                    self.coeff = c
-                    self.log_switch(self.lam, new_PES, r, v, c, 0)
-                    self.lam = new_PES
-                    self.delta_R = 0
-                    self.delta_P = 0
-                    self.t += dt_c
-                    return True
-
-            # If energy not conserved using force of hopped surface (or no hop attempted),
-            # retry algorithm with smaller step size
-            return False
+                    # Check if this conserves energy. If so, no need to adjust velocity
+                    energy_new = u1[new_PES] + self.calc_KE(v)
+                    if abs(energy_new - energy0) < self.e_tol:
+                        self.r = r
+                        self.v = v
+                        self.a = a
+                        self.coeff = c
+                        self.log_switch(self.lam, new_PES, r, v, c, 0)
+                        self.lam = new_PES
+                        self.delta_R = 0
+                        self.delta_P = 0
+                        self.t += dt_c
+                        return True
+                # If energy not conserved using force of hopped surface (or no hop attempted),
+                # retry algorithm with smaller step size
+                return False
 
         # Adjust velocity if necessary
         if hop_attempted:
