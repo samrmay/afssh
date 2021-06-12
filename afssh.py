@@ -267,7 +267,6 @@ class AFSSH():
             else:
                 # Carry out correction and set moments to 0
                 self.lam = new_PES
-                self.lam = new_PES
                 c_a = np.sum(np.square(dlj))
                 c_b = np.sum(2*dlj*v0)
                 c_c = (2/self.m)*diff
@@ -285,6 +284,14 @@ class AFSSH():
             if self.deco:
                 self.propagate_moments()
                 self.collapse_functions()
+
+            # Update parameters
+            self.t += dt_c
+            self.v = v
+            self.r = r
+            self.a = a
+            self.coeff = c
+            return True
 
     def run(self, max_iter, stopping_fcn):
         for _ in range(max_iter):
