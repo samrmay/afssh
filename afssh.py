@@ -103,7 +103,7 @@ class AFSSH():
     def calc_traj(self, r0, v0, del_t, a0=None):
         """
         Propagates position, velocity using velocity Verlet algorithm (with half step velocity).
-        If a == None, calculate a0 from model
+        If a == None, intiialize as 0
         Uses self.lam for current PES
         If langevin flag active, add damping (friction) and random motion (solvent)
 
@@ -112,19 +112,17 @@ class AFSSH():
             v: new velocity at time t0 + del_t
             a: new acceleration at time t0 + del_t
         """
-
         if a0 == None:
-            a0 = -self.model.get_d_adiabatic_energy(r0)[self.lam]/self.m
+            a0 = 0
             if self.langevin:
                 a0 += -self.damping*v0 + self.rand_force()
 
         half_v = v0 + .5*a0*del_t
-        r = r0 + (half_v)*del_t
+        r = r0 + half_v*del_t
         a = -self.model.get_d_adiabatic_energy(r)[self.lam]/self.m
         if self.langevin:
             a += -self.damping*half_v + self.rand_force()
         v = half_v + .5*a*del_t
-
         return r, v, a
 
     def rand_force(self):
