@@ -21,6 +21,23 @@ class AFSSH():
     """
 
     def __init__(self, model, r0, v0, dt_c, e_tol=1e-3, coeff=None, mass=2000, t0=0, state0=0, deco=False, seed=None):
+        """
+        Instantiates AFSSH class
+
+        Parameters
+            model (model): Diabatic potential model on which trajectory will travel
+            r0 (ndarray): vector describing start position of particle
+            v0 (ndarray): vector describing start velocity of particle
+            dt_c (int): default classical time step for algorithm
+            e_tol (float): energy tolerance when trying to conserve energy. Will not attempt to conserve energy if None
+            coeff (ndarray): start coefficients of particle. If None, instantiate fully in ground state
+            state0 (int): start PES for particle. Should match coeff
+            deco (bool): Flag for accounting for decoherence. Defaults to False
+            seed (int): Seed to use for random number generator
+
+        Returns
+            AFFSH: Class to propagate particle 
+        """
         self.model = model
         self.m = mass
         self.dt_c = dt_c
@@ -95,6 +112,17 @@ class AFSSH():
         return r, v, a
 
     def calc_overlap_mtx(self, r0, r1, correction=1e-6):
+        """
+        Calculates overlap matrix U, which measures overlap between adiabatic wave functions at r0 and r1
+
+        Parameters
+            r0 (ndarray): initial particle position
+            r1 (ndarray): final particle position
+            correction (float): If 0 along U mtx diagonal, correction with which to fudge Hamiltonian. Any small float will do
+
+        Returns
+            u_mtx (ndarray): overlap matrix with dimensions (num_states, num_states)
+        """
         # Calculate phi(t0) and phi(t0 + tau)
         ev0 = self.model.get_wave_function(r0)
         ev1 = self.model.get_wave_function(r1)
@@ -122,11 +150,18 @@ class AFSSH():
         u_mtx = self.orthogonalize(u_mtx)
         return u_mtx
 
-    def calc_t_mtx(self, u_mtx, d_tc):
+    def calc_t_mtx(self, u_mtx, dt_c):
         """
-        Calculate time density mtx. at d_tc/2 using eq. 29 and a proper U mtx.
+        Calculate time derivative mtx. at dt_c/2 using eq. 29 and a proper U mtx.
+
+        Parameters
+            u_mtx (ndarray): overlap matrix for time=dt_c
+            dt_c (int): classical time step
+
+        Returns
+            t_mtx (ndarray): Time derivative matrix for t=dt_c/2
         """
-        return (1/d_tc)*linalg.logm(u_mtx)
+        return (1/dt_c)*linalg.logm(u_mtx)
 
     def calc_coeff(self, t0, t1, V, T, coeff0):
         """
@@ -139,6 +174,9 @@ class AFSSH():
             Paper suggests linear interpolation between potential at times t0 and t1
             T (iterable): time derivative matrix
             coeff0: intial coefficients at time t0
+
+        Returns
+            coeff (ndarray): coefficients integrated from t0 to t1
         """
         def f(t, c):
             energy = V(t)
@@ -148,14 +186,53 @@ class AFSSH():
         result = integrate.solve_ivp(f, (t0, t1), coeff0)
         return result.y[:, -1]
 
+    """
+    Calculate probability of hopping from surface lam to every other surface
+
+    Parameters
+        coeff (ndarray): wave function coefficients
+        t_mtx (ndarray): Time density matrix
+        dt_q (int): Quantim time step
+        lam (int): current PES index
+    
+    Returns
+        hop_vec (ndarray): Vector denoting hop probabilities. v[i] = probability from hopping from lam to i
+    """
+
     def calc_hop_probabilities(self, coeff, t_mtx, dt_q, lam):
         c_vec = coeff/coeff[lam]
         t_vec = t_mtx[:, lam]
         result = -2*dt_q*(c_vec*t_vec).real
         return np.maximum(result, np.zeros(len(c_vec)))
 
+    """
+    Calculate kinetic energy given velocity. Uses class mass
+
+    Parameters
+        v (ndarray): velocity of particle
+
+    Returns
+        KE (float): Kinetic energy of particle
+    """
+
     def calc_KE(self, v):
         return .5*self.m*(mag(v)**2)
+
+    """
+    Add dict object to state switches for logging purposes
+
+    Parameters
+        state0 (int): old state
+        state1 (int): new state
+        r (ndarray): position vector
+        v (ndarray): velocity vector
+        c (ndarray): function coefficients
+        delta_v (float): difference between old PES and new PES at r
+        success (bool): whether state switch was successful
+    
+    Returns
+        None
+    """
 
     def log_switch(self, state0, state1, r, v, c, delta_v, success=True):
         log = {
@@ -168,6 +245,8 @@ class AFSSH():
             "success": success
         }
         self.switches.append(log)
+
+        return None
 
     def propagate_moments(self):
         """
@@ -182,9 +261,27 @@ class AFSSH():
         pass
 
     def orthogonalize(self, mtx):
+        """
+        Orthogonalize hermitian matrix using Lowdin orthogonalization scheme
+
+        Parameters
+            mtx (ndarray): Hermitian matrix to be orthogonalized
+
+        Returns
+            ortho_mtx (ndarray): orthogonalized matrix
+        """
         return mtx@linalg.fractional_matrix_power((mtx.T@mtx), -.5)
 
     def step(self, dt_c):
+        """
+        Advances algorithm one step by time dt_c
+
+        Parameters
+            dt_c (int): classical time step by which to advance algorithm
+
+        Returns
+            success (bool): Whether energy was conserved. If False, run step again with smaller dt_c
+        """
         t0 = self.t
 
         # Nuclear classical evolution using classical time step dt_c
@@ -315,7 +412,7 @@ class AFSSH():
                 # Need to rerun step with smaller step size
                 self.step(int(self.dt_c/2))
 
-            if (self.debug and i % 100 == 0):
+            if (debug and i % 100 == 0):
                 print(self.r, self.v, self.calc_KE(self.v))
 
             if stopping_fcn(self):
