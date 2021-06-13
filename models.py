@@ -144,3 +144,13 @@ class Extended_Coupling_With_Reflection(Diabatic_Model):
             dV12 = dV21 = self.C*self.B*math.exp(self.C*x)
 
         return np.asarray([[dV11, dV12], [dV21, dV22]])
+
+
+def plot_1d(ax, model, x_linspace):
+    potentials = np.zeros((len(x_linspace), model.num_states))
+    for i in range(len(x_linspace)):
+        x = x_linspace[i]
+        potentials[i] = model.get_adiabatic_energy(x)
+
+    for i in range(model.num_states):
+        ax.plot(x_linspace, potentials[:, i])
