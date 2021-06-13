@@ -20,7 +20,7 @@ class AFSSH():
     Closely follows http://dx.doi.org/10.1021/acs.jctc.6b00673 and equation references are from this paper
     """
 
-    def __init__(self, model, r0, v0, dt_c, e_tol=1e-3, coeff=None, mass=2000, t0=0, state0=0, deco=False, seed=None):
+    def __init__(self, model, r0, v0, dt_c, e_tol=1e-3, coeff=None, mass=2000, t0=0, state0=0, deco=False, langevin=None, seed=None):
         """
         Instantiates AFSSH class
 
@@ -33,6 +33,7 @@ class AFSSH():
             coeff (ndarray): start coefficients of particle. If None, instantiate fully in ground state
             state0 (int): start PES for particle. Should match coeff
             deco (bool): Flag for accounting for decoherence. Defaults to False
+            langevin (dict): dictionary with keys damp and temp. If None, no Langevin dynamics
             seed (int): Seed to use for random number generator
 
         Returns
@@ -87,29 +88,50 @@ class AFSSH():
         if seed != None:
             rand.seed(seed)
 
+        # Handle Langevin is applicable
+        if langevin != None:
+            self.damping = langevin.get('damp')
+            self.temp = langevin.get('temp')
+            self.langevin = True
+        else:
+            self.langevin = False
+
         # Initialize constants
         self.HBAR = 1
+        self.BM = 3.617e-6
 
     def calc_traj(self, r0, v0, del_t, a0=None):
         """
         Propagates position, velocity using velocity Verlet algorithm (with half step velocity).
         If a == None, calculate a0 from model
         Uses self.lam for current PES
+        If langevin flag active, add damping (friction) and random motion (solvent)
 
         Returns:
             r: new position at time t0 + del_t
             v: new velocity at time t0 + del_t
             a: new acceleration at time t0 + del_t
         """
+
         if a0 == None:
             a0 = -self.model.get_d_adiabatic_energy(r0)[self.lam]/self.m
+            if self.langevin:
+                a0 += -self.damping*v0 + self.rand_force()
 
         half_v = v0 + .5*a0*del_t
         r = r0 + (half_v)*del_t
         a = -self.model.get_d_adiabatic_energy(r)[self.lam]/self.m
+        if self.langevin:
+            a += -self.damping*half_v + self.rand_force()
         v = half_v + .5*a*del_t
 
         return r, v, a
+
+    def rand_force(self):
+        """
+        Returns random Langevin force from gaussian distribution times temperature and damping constant
+        """
+        return 2*np.random.normal(self.dim)*self.damping*self.BM*self.temp
 
     def calc_overlap_mtx(self, r0, r1, correction=1e-6):
         """
