@@ -106,19 +106,20 @@ class AFSSH():
                 for j in range(self.num_states):
                     u_mtx[i, j] = ev0[:, i]@ev1[:, j]
             return u_mtx
+
         u_mtx = calc(ev0, ev1)
         if np.any(np.less(np.diag(u_mtx), np.zeros(self.num_states))):
             u_mtx = calc(-1*ev0, ev1)
 
         # Check for trivial crossing edge case and correct if necessary (eq. 30-33)
-        if np.any(np.equal(u_mtx, np.zeros(self.num_states))):
+        if np.any(np.equal(np.diag(u_mtx), np.zeros(self.num_states))):
             adj_ev0 = self.model.get_wave_function(r0, correction=correction)
             adj_ev1 = self.model.get_wave_function(r1, correction=correction)
             raise Exception("0 IN U_MTX. UNHANDLED CASE")
             # ADD CORRECTION HERE
 
-        # Orthogonalize U (eq. 34) (Make sure dont need to take inverse of this)
-        u_mtx = u_mtx@(linalg.sqrtm(np.transpose(u_mtx)@u_mtx))
+        # Orthogonalize U
+        u_mtx = self.orthogonalize(u_mtx)
         return u_mtx
 
     def calc_t_mtx(self, u_mtx, d_tc):
@@ -180,6 +181,9 @@ class AFSSH():
         """
         pass
 
+    def orthogonalize(self, mtx):
+        return mtx@linalg.fractional_matrix_power((mtx.T@mtx), -.5)
+
     def step(self, dt_c):
         t0 = self.t
 
@@ -190,7 +194,7 @@ class AFSSH():
         r, v, a = self.calc_traj(r0, v0, dt_c, a0=a0)
 
         # Calculate overlap matrix and time density mtx
-        u_mtx = self.calc_overlap_mtx(t0, t0 + dt_c)
+        u_mtx = self.calc_overlap_mtx(r0, r)
         t_mid = self.calc_t_mtx(u_mtx, dt_c)
 
         # Determine dt_q (eq. 20, 21)
