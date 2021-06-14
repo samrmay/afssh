@@ -206,55 +206,52 @@ class AFSSH():
         result = integrate.solve_ivp(f, (t0, t1), coeff0)
         return result.y[:, -1]
 
-    """
-    Calculate probability of hopping from surface lam to every other surface
-
-    Parameters
-        coeff (ndarray): wave function coefficients
-        t_mtx (ndarray): Time density matrix
-        dt_q (int): Quantim time step
-        lam (int): current PES index
-    
-    Returns
-        hop_vec (ndarray): Vector denoting hop probabilities. v[i] = probability from hopping from lam to i
-    """
-
     def calc_hop_probabilities(self, coeff, t_mtx, dt_q, lam):
+        """
+        Calculate probability of hopping from surface lam to every other surface
+
+        Parameters
+            coeff (ndarray): wave function coefficients
+            t_mtx (ndarray): Time density matrix
+            dt_q (int): Quantim time step
+            lam (int): current PES index
+
+        Returns
+            hop_vec (ndarray): Vector denoting hop probabilities. v[i] = probability from hopping from lam to i
+        """
         c_vec = coeff/coeff[lam]
         t_vec = t_mtx[:, lam]
         result = -2*dt_q*(c_vec*t_vec).real
         return np.maximum(result, np.zeros(len(c_vec)))
 
-    """
-    Calculate kinetic energy given velocity. Uses class mass
-
-    Parameters
-        v (ndarray): velocity of particle
-
-    Returns
-        KE (float): Kinetic energy of particle
-    """
-
     def calc_KE(self, v):
+        """
+        Calculate kinetic energy given velocity. Uses class mass
+
+        Parameters
+            v (ndarray): velocity of particle
+
+        Returns
+            KE (float): Kinetic energy of particle
+        """
         return .5*self.m*(mag(v)**2)
 
-    """
-    Add dict object to state switches for logging purposes
-
-    Parameters
-        state0 (int): old state
-        state1 (int): new state
-        r (ndarray): position vector
-        v (ndarray): velocity vector
-        c (ndarray): function coefficients
-        delta_v (float): difference between old PES and new PES at r
-        success (bool): whether state switch was successful
-    
-    Returns
-        None
-    """
-
     def log_switch(self, state0, state1, r, v, c, delta_v, success=True):
+        """
+        Add dict object to state switches for logging purposes
+
+        Parameters
+            state0 (int): old state
+            state1 (int): new state
+            r (ndarray): position vector
+            v (ndarray): velocity vector
+            c (ndarray): function coefficients
+            delta_v (float): difference between old PES and new PES at r
+            success (bool): whether state switch was successful
+
+        Returns
+            None
+        """
         log = {
             "old_state": state0,
             "new_state": state1,
