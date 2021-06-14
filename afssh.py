@@ -134,12 +134,14 @@ class AFSSH():
 
     def calc_overlap_mtx(self, r0, r1, correction=1e-6):
         """
-        Calculates overlap matrix U, which measures overlap between adiabatic wave functions at r0 and r1
+        Calculates overlap matrix U, which measures overlap between adiabatic wave functions at r0 and r1.
+        Has phase correction from http://dx.doi.org/10.1021/acs.jctc.9b00952
+        **ONLY HAS PHASE CORRECTION FOR REAL HAMILTONIAN REGIME. NEED TO IMPLEMENT FOR COMPLEX**
 
         Parameters
             r0 (ndarray): initial particle position
             r1 (ndarray): final particle position
-            correction (float): If 0 along U mtx diagonal, correction with which to fudge Hamiltonian. Any small float will do
+            correction(float): correction in case of zero in U
 
         Returns
             u_mtx (ndarray): overlap matrix with dimensions (num_states, num_states)
@@ -149,27 +151,49 @@ class AFSSH():
         ev1 = self.model.get_wave_function(r1)
 
         # Calculate u_mtx, ensuring positive diagonal (eq. 5)
-        def calc(ev0, ev1):
-            u_mtx = np.zeros((self.num_states, self.num_states))
+        U = np.zeros((self.num_states, self.num_states))
+        for i in range(self.num_states):
+            for j in range(self.num_states):
+                U[i, j] = ev0[:, i]@ev1[:, j]
+
+        if np.any(np.equal(np.diag(U), np.zeros(self.num_states))):
+            ev0 = self.model.get_wave_function(r0, correction)
+            ev1 = self.model.get_wave_function(r1, correction)
+            print("TEST")
             for i in range(self.num_states):
                 for j in range(self.num_states):
-                    u_mtx[i, j] = ev0[:, i]@ev1[:, j]
-            return u_mtx
+                    U[i, j] = ev0[:, i]@ev1[:, j]
 
-        u_mtx = calc(ev0, ev1)
-        if np.any(np.less(np.diag(u_mtx), np.zeros(self.num_states))):
-            u_mtx = calc(-1*ev0, ev1)
+        # If determinant of U is -1, flip phase of first eigenvector for r1
+        # (flip first column of U)
+        if linalg.det(U) == -1.0:
+            U[:, 0] *= -1
 
-        # Check for trivial crossing edge case and correct if necessary (eq. 30-33)
-        if np.any(np.equal(np.diag(u_mtx), np.zeros(self.num_states))):
-            adj_ev0 = self.model.get_wave_function(r0, correction=correction)
-            adj_ev1 = self.model.get_wave_function(r1, correction=correction)
-            raise Exception("0 IN U_MTX. UNHANDLED CASE")
-            # ADD CORRECTION HERE
+        # # Enforce second condition PROBLEM
+        # def jacobi_sweep():
+        #     converged = True
+
+        #     for i in range(self.num_states):
+        #         for j in range(i+1, self.num_states):
+        #             d = 3*((U[i, i]**2) + (U[j, j]**2))
+        #             d += 6*U[i, j]*U[j, i]
+        #             d += 8*(U[i, i] + U[j, j])
+        #             d -= 3*sum([(U[i, l]*U[l, i]) + (U[j, l]*U[l, j])
+        #                        for l in range(self.num_states)])
+
+        #             if d < 0:
+        #                 U[:, i] *= -1
+        #                 U[:, j] *= -1
+        #                 converged = False
+        #     return converged
+
+        # converged = False
+        # while not converged:
+        #     converged = jacobi_sweep()
 
         # Orthogonalize U
-        u_mtx = self.orthogonalize(u_mtx)
-        return u_mtx
+        U = self.orthogonalize(U)
+        return U
 
     def calc_t_mtx(self, u_mtx, dt_c):
         """
@@ -396,20 +420,17 @@ class AFSSH():
                 self.log_switch(self.lam, self.lam, r, v, c, diff, False)
             else:
                 # Carry out correction and set moments to 0
-                self.lam = new_PES
                 c_a = np.sum(np.square(dlj))
                 c_b = np.sum(2*dlj*v0)
                 c_c = (2/self.m)*diff
                 factors = quadratic(c_a, c_b, c_c)
-
-                correction = factors[0]*dlj
-                if correction > 0 and diff > 0:
-                    correction = factors[1]*dlj
+                correction = min(factors)*dlj
 
                 v = v0 + correction
                 self.delta_R = 0
                 self.delta_P = 0
                 self.log_switch(self.lam, new_PES, r, v, c, diff)
+                self.lam = new_PES
 
         # Decoherence calculations (unimplemented)
         if self.deco:
