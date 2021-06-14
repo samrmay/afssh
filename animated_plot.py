@@ -4,25 +4,30 @@ import stopping_functions as fcns
 import matplotlib.pyplot as plt
 import matplotlib.animation as animation
 
-f = fcns.basic_1d(-6, 6)
+f = fcns.basic_1d(-8, 8)
 
 
-def animate_1d(fssh, fig, ax, stopping_function=f, min_x=-10, max_x=10, interval=50, num_points=400):
+def animate_1d(fssh, fig, ax, stopping_function=f, min_x=-10, max_x=10, interval=.5, num_points=400):
     x_linspace = np.linspace(min_x, max_x, num_points)
     model = fssh.model
     models.plot_1d(ax, model, x_linspace)
 
-    point, = ax.plot(fssh.r[0], model.get_adiabatic_energy(
-        fssh.r[0])[fssh.lam], 'ro')
-    v_text = plt.text(-5, 0, fssh.v[0])
+    U = model.get_adiabatic_energy(fssh.r[0])[fssh.lam]
+    v = fssh.v[0]
+    point, = ax.plot(fssh.r[0], U, 'ro')
+    v_text = plt.text(-5, 0.012, f"v: f{v}")
+    e_text = plt.text(-5, .01, f"E: f{U + fssh.calc_KE(v)}")
 
     def animate(_):
-        if not fssh.step(fssh.dt_c):
+        if not fssh.step(fssh.dt_c) or f(fssh):
             return None
+        U = model.get_adiabatic_energy(fssh.r[0])[fssh.lam]
+        v = fssh.v[0]
         point.set_xdata(fssh.r[0])
-        point.set_ydata(model.get_adiabatic_energy(fssh.r[0])[fssh.lam])
-        v_text.set_text(fssh.v[0])
-        return point, v_text,
+        point.set_ydata(U)
+        v_text.set_text(v)
+        e_text.set_text(f"E: {U + fssh.calc_KE(v)}")
+        return point, v_text, e_text
 
     ani = animation.FuncAnimation(
         fig, animate, interval=interval, blit=True, save_count=0)
@@ -37,7 +42,7 @@ def animate_2d(fssh, fig, ax, x_linspace, y_linspace, stopping_function=f, inter
         fssh.r)[fssh.lam], marker='o')
 
     def animate(_):
-        if not fssh.step(fssh.dt_c):
+        if not fssh.step(fssh.dt_c) or f(fssh):
             return None
         point.set_data(fssh.r)
         point.set_3d_properties(
