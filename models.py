@@ -146,27 +146,34 @@ class Extended_Coupling_With_Reflection(Diabatic_Model):
         return np.asarray([[dV11, dV12], [dV21, dV22]])
 
 
-class coupled_osc1d(Diabatic_Model):
-    def __init__(self, A=.01, B=1, C=.005, D=1):
+class Coupled_Osc1d(Diabatic_Model):
+    def __init__(self, A=.0001, B=1.0, C=.0001, D=1.0, E=0):
         self.A = A
         self.B = B
         self.C = C
         self.D = D
+        self.E = E
         self.num_states = 2
 
         super().__init__(self.num_states)
 
     def V(self, x):
+        if hasattr(x, "__len__"):
+            x = x[0]
+
         V11 = self.A*(x + self.B)**2
-        V22 = self.A*(x - self.B)**2
+        V22 = (self.A*(x - self.B)**2) + self.E
         V12 = V21 = self.C*math.exp(-self.D*(x**2))
-        return np.array([[V11, V12], [V21, V22]])
+        return np.asarray([[V11, V12], [V21, V22]])
 
     def dV(self, x):
+        if hasattr(x, "__len__"):
+            x = x[0]
+
         dV11 = self.A*2*(x + self.B)
         dV22 = self.A*2*(x - self.B)
         dV12 = dV21 = -2*self.C*self.D*x*math.exp(-self.D*(x**2))
-        return np.array([[dV11, dV12], [dV21, dV22]])
+        return np.asarray([[dV11, dV12], [dV21, dV22]])
 
 
 def plot_1d(ax, model, x_linspace):
