@@ -115,21 +115,22 @@ class AFSSH():
         if a0 == None:
             a0 = 0
             if self.langevin:
-                a0 += -self.damping*v0 + self.rand_force()
+                a0 += -self.damping*v0 + (self.rand_force(del_t)/self.m)
 
         half_v = v0 + .5*a0*del_t
         r = r0 + half_v*del_t
         a = -self.model.get_d_adiabatic_energy(r)[self.lam]/self.m
         if self.langevin:
-            a += -self.damping*half_v + self.rand_force()
+            a += -self.damping*half_v + (self.rand_force(del_t)/self.m)
         v = half_v + .5*a*del_t
         return r, v, a
 
-    def rand_force(self):
+    def rand_force(self, dt):
         """
         Returns random Langevin force from gaussian distribution times temperature and damping constant
         """
-        return 2*np.random.normal(self.dim)*self.damping*self.BM*self.temp
+        sigma = np.sqrt(2*self.damping*self.m*self.BM*self.temp/dt)
+        return 2*np.random.normal(size=self.dim, scale=sigma)
 
     def calc_overlap_mtx(self, r0, r1, correction=1e-6):
         """
