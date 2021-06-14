@@ -150,12 +150,17 @@ class Extended_Coupling_With_Reflection(Diabatic_Model):
 
 
 class Coupled_Osc1d(Diabatic_Model):
-    def __init__(self, A=.0001, B=2.0, C=.0001, D=1.0, E=0):
-        self.A = A
-        self.B = B
-        self.C = C
-        self.D = D
-        self.E = E
+    """
+    From Landry and Subotnik 2011 https://doi.org/10.1063/1.3663870
+    """
+
+    def __init__(self, omega=3.5e-4, Er=2.39e-2, E0=1.5e-2, coup=1.49e-5, mass=2000):
+        self.omega = omega
+        self.Er = Er
+        self.E0 = E0
+        self.coup = coup
+        self.mass = mass
+        self.M = np.sqrt(self.Er*self.mass*(self.omega**2)/2)
         self.num_states = 2
 
         super().__init__(self.num_states)
@@ -164,18 +169,18 @@ class Coupled_Osc1d(Diabatic_Model):
         if hasattr(x, "__len__"):
             x = x[0]
 
-        V11 = self.A*(x + self.B)**2
-        V22 = (self.A*(x - self.B)**2) + self.E
-        V12 = V21 = self.C*math.exp(-self.D*(x**2))
+        V11 = (.5*self.mass*(self.omega**2)*x) + self.M*x
+        V22 = (.5*self.mass*(self.omega**2)*x) - self.M*x - self.E0
+        V12 = V21 = self.coup
         return np.asarray([[V11, V12], [V21, V22]])
 
     def dV(self, x):
         if hasattr(x, "__len__"):
             x = x[0]
 
-        dV11 = self.A*2*(x + self.B)
-        dV22 = self.A*2*(x - self.B)
-        dV12 = dV21 = -2*self.C*self.D*x*math.exp(-self.D*(x**2))
+        dV11 = self.mass*(self.omega**2)*x + self.M
+        dV22 = self.mass*(self.omega**2)*x - self.M
+        dV12 = dV21 = 0
         return np.asarray([[dV11, dV12], [dV21, dV22]])
 
 
