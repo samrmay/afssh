@@ -41,6 +41,9 @@ class Diabatic_Model:
         return grad_v
 
     def get_d_wave_functions(self, x, step=0.00001):
+        if not hasattr(x, "__len__"):
+            x = np.asarray([x])
+
         grad_phi = np.zeros((self.num_states, self.num_states, self.dim))
         for i in range(self.dim):
             x1 = np.copy(x)
@@ -147,7 +150,7 @@ class Extended_Coupling_With_Reflection(Diabatic_Model):
 
 
 class Coupled_Osc1d(Diabatic_Model):
-    def __init__(self, A=.0001, B=1.0, C=.0001, D=1.0, E=0):
+    def __init__(self, A=.0001, B=2.0, C=.0001, D=1.0, E=0):
         self.A = A
         self.B = B
         self.C = C
@@ -184,3 +187,20 @@ def plot_1d(ax, model, x_linspace):
 
     for i in range(model.num_states):
         ax.plot(x_linspace, potentials[:, i])
+
+
+def plot_1d_coupling(ax, model, x_linspace, coupling_scaling_factor):
+    l = len(x_linspace)
+    coupling = np.zeros((model.num_states, model.num_states, l))
+    for i in range(l):
+        x = x_linspace[i]
+        phi = model.get_wave_function(x)
+        grad_phi = model.get_d_wave_functions(x)
+        for j in range(model.num_states):
+            for k in range(model.num_states):
+                coupling[j, k, i] = phi[:, j]@grad_phi[:, k]
+
+    for i in range(model.num_states):
+        for j in range(model.num_states):
+            if i != j:
+                ax.plot(x_linspace, coupling[i, j, :]*coupling_scaling_factor)
