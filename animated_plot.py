@@ -19,7 +19,7 @@ def animate_1d(fssh, fig, ax, stopping_function=f, min_x=-10, max_x=10, interval
     e_text = plt.text(-5, .01, f"E: f{U + fssh.calc_KE(v)}")
 
     def animate(_):
-        if not fssh.step(fssh.dt_c) or f(fssh):
+        if not fssh.step(fssh.dt_c) or stopping_function(fssh):
             return None
         U = model.get_adiabatic_energy(fssh.r[0])[fssh.lam]
         v = fssh.v[0]
@@ -34,7 +34,7 @@ def animate_1d(fssh, fig, ax, stopping_function=f, min_x=-10, max_x=10, interval
     return ani
 
 
-def animate_2d(fssh, fig, ax, x_linspace, y_linspace, stopping_function=f, interval=50, num_points=400, colors=["black", "red"]):
+def animate_2d(fssh, fig, ax, x_linspace, y_linspace, stopping_function=f, interval=50, colors=["black", "red"]):
     model = fssh.model
     models.plot_2d(ax, model, x_linspace, y_linspace, colors)
 
@@ -42,7 +42,7 @@ def animate_2d(fssh, fig, ax, x_linspace, y_linspace, stopping_function=f, inter
         fssh.r)[fssh.lam], marker='o')
 
     def animate(_):
-        if not fssh.step(fssh.dt_c) or f(fssh):
+        if not fssh.step(fssh.dt_c) or stopping_function(fssh):
             return None
         point.set_data(fssh.r)
         point.set_3d_properties(
