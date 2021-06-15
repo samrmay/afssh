@@ -132,7 +132,7 @@ class AFSSH():
         sigma = np.sqrt(2*self.damping*self.m*self.BM*self.temp/dt)
         return 2*np.random.normal(size=self.dim, scale=sigma)
 
-    def calc_overlap_mtx(self, r0, r1, correction=1e-6):
+    def calc_overlap_mtx(self, r0, r1, correction=1e-10):
         """
         Calculates overlap matrix U, which measures overlap between adiabatic wave functions at r0 and r1.
         Has phase correction from http://dx.doi.org/10.1021/acs.jctc.9b00952
@@ -159,37 +159,34 @@ class AFSSH():
         if np.any(np.equal(np.diag(U), np.zeros(self.num_states))):
             ev0 = self.model.get_wave_function(r0, correction)
             ev1 = self.model.get_wave_function(r1, correction)
-            print("TEST")
             for i in range(self.num_states):
                 for j in range(self.num_states):
                     U[i, j] = ev0[:, i]@ev1[:, j]
-
         # If determinant of U is -1, flip phase of first eigenvector for r1
         # (flip first column of U)
-        if linalg.det(U) == -1.0:
+        if int(linalg.det(U)) == -1:
             U[:, 0] *= -1
 
-        # # Enforce second condition PROBLEM
-        # def jacobi_sweep():
-        #     converged = True
+        # Enforce second condition PROBLEM
+        def jacobi_sweep():
+            converged = True
 
-        #     for i in range(self.num_states):
-        #         for j in range(i+1, self.num_states):
-        #             d = 3*((U[i, i]**2) + (U[j, j]**2))
-        #             d += 6*U[i, j]*U[j, i]
-        #             d += 8*(U[i, i] + U[j, j])
-        #             d -= 3*sum([(U[i, l]*U[l, i]) + (U[j, l]*U[l, j])
-        #                        for l in range(self.num_states)])
+            for i in range(self.num_states):
+                for j in range(i+1, self.num_states):
+                    d = 3*((U[i, i]**2) + (U[j, j]**2))
+                    d += 6*U[i, j]*U[j, i]
+                    d += 8*(U[i, i] + U[j, j])
+                    d -= 3*sum([(U[i, l]*U[l, i]) + (U[j, l]*U[l, j])
+                               for l in range(self.num_states)])
+                    if d < 0:
+                        U[:, i] *= -1
+                        U[:, j] *= -1
+                        converged = False
+            return converged
 
-        #             if d < 0:
-        #                 U[:, i] *= -1
-        #                 U[:, j] *= -1
-        #                 converged = False
-        #     return converged
-
-        # converged = False
-        # while not converged:
-        #     converged = jacobi_sweep()
+        converged = False
+        while not converged:
+            converged = jacobi_sweep()
 
         # Orthogonalize U
         U = self.orthogonalize(U)
@@ -226,7 +223,7 @@ class AFSSH():
         def f(t, c):
             energy = V(t)
             summation = np.sum(T*np.tile(c, (self.num_states, 1)), axis=1)
-            return (energy*c - summation)/(1j*self.HBAR)
+            return (energy*c/1j/self.HBAR) - summation
 
         result = integrate.solve_ivp(f, (t0, t1), coeff0)
         return result.y[:, -1]
@@ -246,7 +243,7 @@ class AFSSH():
         """
         c_vec = coeff/coeff[lam]
         t_vec = t_mtx[:, lam]
-        result = -2*dt_q*(c_vec*t_vec).real
+        result = -2*dt_q*(c_vec.real)*t_vec
         return np.maximum(result, np.zeros(len(c_vec)))
 
     def calc_KE(self, v):
@@ -350,7 +347,7 @@ class AFSSH():
         n_q = int(dt_c/dt_q)
         u0 = self.model.get_adiabatic_energy(r0)
         u1 = self.model.get_adiabatic_energy(r)
-        def u_interp(t): return u0 + ((t - t0)/(dt_c))*(u1-u0)
+        def u_interp(t): return u0 + ((t - t0)/dt_c)*(u1-u0)
         c0 = self.coeff
         hop_attempted = False
         new_PES = self.lam
@@ -364,14 +361,12 @@ class AFSSH():
                 hop_vector = self.calc_hop_probabilities(
                     c, t_mid, dt_q, self.lam)
                 delta = rand.random()
-
                 # Try to hop to any state
                 for i in range(self.num_states):
                     if delta < hop_vector[i] and i != self.lam:
                         hop_attempted = True
                         new_PES = i
                         break
-
             c0 = c
 
         # Check energy conservation (if applicable)
@@ -420,11 +415,14 @@ class AFSSH():
                 self.log_switch(self.lam, self.lam, r, v, c, diff, False)
             else:
                 # Carry out correction and set moments to 0
-                c_a = np.sum(np.square(dlj))
-                c_b = np.sum(2*dlj*v0)
-                c_c = (2/self.m)*diff
-                factors = quadratic(c_a, c_b, c_c)
-                correction = min(factors)*dlj
+                if dlj == 0:
+                    correction = 0
+                else:
+                    c_a = np.sum(np.square(dlj))
+                    c_b = np.sum(2*dlj*v0)
+                    c_c = (2/self.m)*diff
+                    factors = quadratic(c_a, c_b, c_c)
+                    correction = min(factors)*dlj
 
                 v = v0 + correction
                 self.delta_R = 0
