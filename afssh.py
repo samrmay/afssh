@@ -414,19 +414,19 @@ class AFSSH():
                 self.log_switch(self.lam, self.lam, r, v, c, diff, False)
             else:
                 # Carry out correction and set moments to 0
-                if dlj == 0:
-                    correction = 0
-                else:
+                # If dlj == 0, denotes trivial crossing (WHY???).
+                # At trivial crossing dlj -> infinity, correction -> 0, therefore do nothing
+                if dlj != 0:
                     c_a = np.sum(np.square(dlj))
                     c_b = np.sum(2*dlj*v0)
                     c_c = (2/self.m)*diff
                     factors = quadratic(c_a, c_b, c_c)
                     corrections = factors*dlj
 
-                # Choose velocity correction that minimizes angle between v0 and v
-                v1 = v0 + corrections[0]
-                v2 = v0 + corrections[1]
-                v = min(v1, v2, key=lambda v: angle(v, v0))
+                    # Choose velocity correction that minimizes angle between v0 and v
+                    v1 = v0 + corrections[0]
+                    v2 = v0 + corrections[1]
+                    v = min(v1, v2, key=lambda v: angle(v, v0))
 
                 self.delta_R = 0
                 self.delta_P = 0
