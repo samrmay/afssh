@@ -1,3 +1,4 @@
+from matplotlib.pyplot import xcorr
 import numpy as np
 import math as math
 
@@ -8,7 +9,7 @@ class Diabatic_Model:
         self.dim = dim
 
     def get_adiabatic(self, x, correction=0):
-        v, ev = np.linalg.eig(self.V(x) + correction)
+        v, ev = np.linalg.eigh(self.V(x) + correction)
         d = {}
         for i in range(len(v)):
             d[v[i]] = ev[:, i]
@@ -169,8 +170,8 @@ class Coupled_Osc1d(Diabatic_Model):
         if hasattr(x, "__len__"):
             x = x[0]
 
-        V11 = (.5*self.mass*(self.omega**2)*x) + self.M*x
-        V22 = (.5*self.mass*(self.omega**2)*x) - self.M*x - self.E0
+        V11 = (.5*self.mass*(self.omega**2)*(x**2)) + self.M*x
+        V22 = (.5*self.mass*(self.omega**2)*(x**2)) - self.M*x - self.E0
         V12 = V21 = self.coup
         return np.asarray([[V11, V12], [V21, V22]])
 
@@ -209,3 +210,14 @@ def plot_1d_coupling(ax, model, x_linspace, coupling_scaling_factor):
         for j in range(model.num_states):
             if i != j:
                 ax.plot(x_linspace, coupling[i, j, :]*coupling_scaling_factor)
+
+
+def plot_diabats_1d(ax, model, x_linspace):
+    diabats = np.zeros((len(x_linspace), model.num_states))
+    for i in range(len(x_linspace)):
+        V = model.V(x_linspace[i])
+        for j in range(model.num_states):
+            diabats[i, j] = V[j, j]
+
+    for i in range(model.num_states):
+        ax.plot(x_linspace, diabats[:, i])
