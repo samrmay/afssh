@@ -33,11 +33,11 @@ class Batch:
             self.batch_state = "finished"
             for i in range(num_particles):
                 print(i+1, "/", num_particles)
-                x = fssh.FSSH(self.model, del_t, start_x, self.v, mass)
+                x = fssh.AFSSH(self.model, start_x, self.v, del_t, mass=mass)
                 x.run(max_iter, self.stopping_function, self.debug)
 
                 self.states.append(
-                    (x.r, x.v, x.e_state, x.t, x.coeff, x.i, x.switches))
+                    (x.r, x.v, x.lam, x.t, x.coeff, x.i, x.switches))
         except Exception as e:
             self.batch_state = "failed"
             self.batch_error = e
