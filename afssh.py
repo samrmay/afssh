@@ -9,6 +9,12 @@ def mag(v):
     return np.sqrt(np.sum(np.square(v)))
 
 
+def angle(v1, v2):
+    cos_theta = np.dot(v1, v2)/mag(v1)/mag(v2)
+    cos_theta = max(min(cos_theta, 1), 0)
+    return math.acos(cos_theta)
+
+
 def quadratic(a, b, c):
     p2 = math.sqrt((b**2) - 4*a*c)
     return (-b + p2)/2/a, (-b - p2)/2/a
@@ -160,7 +166,7 @@ class AFSSH():
         if int(linalg.det(U)) == -1:
             U[:, 0] *= -1
 
-        # Enforce second condition PROBLEM
+        # Enforce second condition
         def jacobi_sweep():
             converged = True
 
@@ -415,9 +421,13 @@ class AFSSH():
                     c_b = np.sum(2*dlj*v0)
                     c_c = (2/self.m)*diff
                     factors = quadratic(c_a, c_b, c_c)
-                    correction = min(factors)*dlj
+                    corrections = factors*dlj
 
-                v = v0 + correction
+                # Choose velocity correction that minimizes angle between v0 and v
+                v1 = v0 + corrections[0]
+                v2 = v0 + corrections[1]
+                v = min(v1, v2, key=lambda v: angle(v, v0))
+
                 self.delta_R = 0
                 self.delta_P = 0
                 self.log_switch(self.lam, new_PES, r, v, c, diff)
