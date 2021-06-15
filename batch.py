@@ -102,7 +102,7 @@ class Batch:
                 line += f"{switch.get('new_state')}. coeff: {switch.get('coefficients')}, "
                 line += f"deltaV: {switch.get('delta_v')}, "
                 line += f"velocity: {switch.get('velocity')}, "
-                line += f"position: {switch.get('position')}"
+                line += f"position: {switch.get('position')}\n"
                 lines.append(line)
 
             avg_pos += state[0]
