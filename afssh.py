@@ -132,7 +132,7 @@ class AFSSH():
         sigma = np.sqrt(2*self.damping*self.m*self.BM*self.temp/dt)
         return 2*np.random.normal(size=self.dim, scale=sigma)
 
-    def calc_overlap_mtx(self, r0, r1, correction=1e-10):
+    def calc_overlap_mtx(self, r0, r1):
         """
         Calculates overlap matrix U, which measures overlap between adiabatic wave functions at r0 and r1.
         Has phase correction from http://dx.doi.org/10.1021/acs.jctc.9b00952
@@ -141,7 +141,6 @@ class AFSSH():
         Parameters
             r0 (ndarray): initial particle position
             r1 (ndarray): final particle position
-            correction(float): correction in case of zero in U
 
         Returns
             u_mtx (ndarray): overlap matrix with dimensions (num_states, num_states)
@@ -156,12 +155,6 @@ class AFSSH():
             for j in range(self.num_states):
                 U[i, j] = ev0[:, i]@ev1[:, j]
 
-        if np.any(np.equal(np.diag(U), np.zeros(self.num_states))):
-            ev0 = self.model.get_wave_function(r0, correction)
-            ev1 = self.model.get_wave_function(r1, correction)
-            for i in range(self.num_states):
-                for j in range(self.num_states):
-                    U[i, j] = ev0[:, i]@ev1[:, j]
         # If determinant of U is -1, flip phase of first eigenvector for r1
         # (flip first column of U)
         if int(linalg.det(U)) == -1:
