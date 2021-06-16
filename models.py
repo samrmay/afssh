@@ -185,6 +185,25 @@ class Coupled_Osc1d(Diabatic_Model):
         return np.asarray([[dV11, dV12], [dV21, dV22]])
 
 
+class Coupled_Osc2d(Diabatic_Model):
+    def __init__(self, omega=3.5e-4, Er=2.39e-2, E0=1.5e-2, coup=1.49e-5, mass=2000):
+        self.omega = omega
+        self.Er = Er
+        self.E0 = E0
+        self.coup = coup
+        self.mass = mass
+        self.M = np.sqrt(self.Er*self.mass*(self.omega**2)/2)
+        self.num_states = 2
+
+        super().__init__(self.num_states, 2)
+
+    def V(self, x):
+        V11 = (.5*self.mass*(self.omega**2)*(sum(x**2))) + self.M*(sum(x))
+        V22 = (.5*self.mass*(self.omega**2)*(sum(x**2))) - self.M*(sum(x)) - self.E0
+        V12 = V21 = self.coup
+        return np.asarray([[V11, V12], [V21, V22]])
+
+
 class NState_Spin_Boson(Diabatic_Model):
     def __init__(self, omega=3.5e-4, Er=2.39e-2, E0=1.5e-2, coup=1.49e-5, mass=2000, l_states=1, r_states=1):
         self.omega = omega
