@@ -185,6 +185,36 @@ class Coupled_Osc1d(Diabatic_Model):
         return np.asarray([[dV11, dV12], [dV21, dV22]])
 
 
+class NState_Spin_Boson(Diabatic_Model):
+    def __init__(self, omega=3.5e-4, Er=2.39e-2, E0=1.5e-2, coup=1.49e-5, mass=2000, l_states=1, r_states=1):
+        self.omega = omega
+        self.Er = Er
+        self.E0 = E0
+        self.coup = coup
+        self.mass = mass
+        self.M = np.sqrt(self.Er*self.mass*(self.omega**2)/2)
+
+        self.l_states = l_states
+        self.r_states = r_states
+        self.num_states = l_states + r_states
+        self.d = E0
+
+        super().__init__(self.num_states)
+
+    def V(self, x):
+        result = np.zeros((self.num_states, self.num_states))
+        result += self.coup
+
+        osc = .5*self.mass*(self.omega**2)*(x**2)
+        for i in range(self.l_states):
+            result[i, i] = osc + (self.M*x) - self.E0 + (i*self.d)
+        for j in range(self.r_states):
+            i = self.l_states + j
+            result[i, i] = osc - (self.M*x) + (j*self.d)
+
+        return result
+
+
 def plot_1d(ax, model, x_linspace):
     potentials = np.zeros((len(x_linspace), model.num_states))
     for i in range(len(x_linspace)):
