@@ -88,7 +88,7 @@ class AFSSH():
         self.delta_P = 0
 
         # Track acceleration to save time when calculating trajectory
-        self.a = None
+        self.a = np.zeros(self.dim)
 
         # Initialize seed if given
         if seed != None:
@@ -106,10 +106,9 @@ class AFSSH():
         self.HBAR = 1
         self.BM = 3.1668e-6
 
-    def calc_traj(self, r0, v0, del_t, a0=None):
+    def calc_traj(self, r0, v0, del_t, a0):
         """
         Propagates position, velocity using velocity Verlet algorithm (with half step velocity).
-        If a == None, intiialize as 0
         Uses self.lam for current PES
         If langevin flag active, add damping (friction) and random motion (solvent)
 
@@ -118,11 +117,6 @@ class AFSSH():
             v: new velocity at time t0 + del_t
             a: new acceleration at time t0 + del_t
         """
-        if a0 == None:
-            a0 = 0
-            if self.langevin:
-                a0 += -self.damping*v0 + (self.rand_force(del_t)/self.m)
-
         half_v = v0 + .5*a0*del_t
         r = r0 + half_v*del_t
         a = -self.model.get_d_adiabatic_energy(r)[self.lam]/self.m
@@ -326,7 +320,7 @@ class AFSSH():
         r0 = self.r
         v0 = self.v
         a0 = self.a
-        r, v, a = self.calc_traj(r0, v0, dt_c, a0=a0)
+        r, v, a = self.calc_traj(r0, v0, dt_c, a0)
 
         # Calculate overlap matrix and time density mtx
         u_mtx = self.calc_overlap_mtx(r0, r)
