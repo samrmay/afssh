@@ -199,7 +199,8 @@ class Coupled_Osc2d(Diabatic_Model):
 
     def V(self, x):
         V11 = (.5*self.mass*(self.omega**2)*(sum(x**2))) + self.M*(sum(x))
-        V22 = (.5*self.mass*(self.omega**2)*(sum(x**2))) - self.M*(sum(x)) - self.E0
+        V22 = (.5*self.mass*(self.omega**2)*(sum(x**2))) - \
+            self.M*(sum(x)) - self.E0
         V12 = V21 = self.coup
         return np.asarray([[V11, V12], [V21, V22]])
 
@@ -270,3 +271,21 @@ def plot_diabats_1d(ax, model, x_linspace):
 
     for i in range(model.num_states):
         ax.plot(x_linspace, diabats[:, i])
+
+
+def plot_2d(ax, model, x_linspace, y_linspace, colors):
+    l = len(x_linspace)
+    if l != len(y_linspace):
+        raise ValueError("Size of axes must be equal")
+
+    if len(colors) != model.num_states:
+        raise ValueError("Number of colors must equal number of states")
+
+    xx, yy = np.meshgrid(x_linspace, y_linspace)
+    V = np.zeros((l, l, model.num_states))
+    for i in range(l):
+        for j in range(l):
+            V[j, i] = model.get_adiabatic_energy(np.asarray([xx[j, i], yy[j, i]]))
+
+    for i in range(model.num_states):
+        ax.plot_wireframe(xx, yy, V[:, :, i], color=colors[i])
