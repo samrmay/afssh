@@ -104,7 +104,7 @@ class AFSSH():
 
         # Initialize constants
         self.HBAR = 1
-        self.BM = 3.617e-6
+        self.BM = 3.1668e-6
 
     def calc_traj(self, r0, v0, del_t, a0=None):
         """
@@ -136,7 +136,7 @@ class AFSSH():
         Returns random Langevin force from gaussian distribution times temperature and damping constant
         """
         sigma = np.sqrt(2*self.damping*self.m*self.BM*self.temp/dt)
-        return 2*np.random.normal(size=self.dim, scale=sigma)
+        return np.random.normal(loc=0, size=self.dim, scale=sigma)
 
     def calc_overlap_mtx(self, r0, r1):
         """
