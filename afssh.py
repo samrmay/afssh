@@ -304,24 +304,7 @@ class AFSSH():
         """
         return mtx@linalg.fractional_matrix_power((mtx.T@mtx), -.5)
 
-    def step(self, dt_c):
-        """
-        Advances algorithm one step by time dt_c
-
-        Parameters
-            dt_c (int): classical time step by which to advance algorithm
-
-        Returns
-            success (bool): Whether energy was conserved. If False, run step again with smaller dt_c
-        """
-        t0 = self.t
-
-        # Nuclear classical evolution using classical time step dt_c
-        r0 = self.r
-        v0 = self.v
-        a0 = self.a
-        r, v, a = self.calc_traj(r0, v0, dt_c, a0)
-
+    def prop_quantum(self, r0, r, u0, u1, dt_c, t0):
         # Calculate overlap matrix and time density mtx
         u_mtx = self.calc_overlap_mtx(r0, r)
         t_mid = self.calc_t_mtx(u_mtx, dt_c)
@@ -336,10 +319,8 @@ class AFSSH():
         dt_q = dt_c/int(round(dt_c/dt_q_prime))
 
         # Carry out quantum time steps from t0 -> t0 + dt_c by dt_q
-        # T is constant, V is varied linearly from u0, u1
+        # T is constant, V is varied )linearly from u0, u1
         n_q = int(dt_c/dt_q)
-        u0 = self.model.get_adiabatic_energy(r0)
-        u1 = self.model.get_adiabatic_energy(r)
         def u_interp(t): return u0 + ((t - t0)/dt_c)*(u1-u0)
         c0 = self.coeff
         hop_attempted = False
@@ -361,6 +342,36 @@ class AFSSH():
                         new_PES = i
                         break
             c0 = c
+        return c, new_PES, hop_attempted
+
+    def step(self, dt_c, classical=False):
+        """
+        Advances algorithm one step by time dt_c
+
+        Parameters
+            dt_c (int): classical time step by which to advance algorithm
+
+        Returns
+            success (bool): Whether energy was conserved. If False, run step again with smaller dt_c
+        """
+        t0 = self.t
+
+        # Nuclear classical evolution using classical time step dt_c
+        r0 = self.r
+        v0 = self.v
+        a0 = self.a
+        r, v, a = self.calc_traj(r0, v0, dt_c, a0)
+        u0 = self.model.get_adiabatic_energy(r0)
+        u1 = self.model.get_adiabatic_energy(r)
+
+        # Propagate quantum effects (if applicable)
+        if not classical:
+            c, new_PES, hop_attempted = self.prop_quantum(
+                r0, r, u0, u1, dt_c, t0)
+            self.coeff = c
+        else:
+            hop_attempted = False
+            new_PES = self.lam
 
         # Check energy conservation (if applicable)
         if self.e_tol != None:
@@ -379,7 +390,6 @@ class AFSSH():
                         self.r = r
                         self.v = v
                         self.a = a
-                        self.coeff = c
                         self.log_switch(self.lam, new_PES, r, v, c, 0)
                         self.lam = new_PES
                         self.delta_R = 0
@@ -400,7 +410,8 @@ class AFSSH():
             if self.calc_KE(v) <= diff:
                 # Frustrated hop
                 F = self.model.get_d_adiabatic_energy(r)
-                check1 = np.dot(F[self.lam], dlj)*np.dot(F[new_PES], dlj) < 0
+                check1 = np.dot(F[self.lam], dlj) * \
+                    np.dot(F[new_PES], dlj) < 0
                 check2 = np.dot(F[new_PES], dlj)*np.dot(r, dlj) < 0
                 if check1 and check2:
                     correction = -np.sum(v0*dlj)/np.sum(np.square(dlj))
@@ -437,7 +448,6 @@ class AFSSH():
         self.v = v
         self.r = r
         self.a = a
-        self.coeff = c
         return True
 
     def run(self, max_iter, stopping_fcn, debug=False):
