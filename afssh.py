@@ -26,7 +26,7 @@ class AFSSH():
     Closely follows http://dx.doi.org/10.1021/acs.jctc.6b00673 and equation references are from this paper
     """
 
-    def __init__(self, model, r0, v0, dt_c, e_tol=1e-3, coeff=None, mass=2000, t0=0, state0=0, deco=False, langevin=None, seed=None):
+    def __init__(self, model, r0, v0, dt_c, e_tol=1e-3, coeff=None, mass=2000, t0=0, state0=0, deco=None, langevin=None, seed=None):
         """
         Instantiates AFSSH class
 
@@ -38,7 +38,7 @@ class AFSSH():
             e_tol (float): energy tolerance when trying to conserve energy. Will not attempt to conserve energy if None
             coeff (ndarray): start coefficients of particle. If None, instantiate fully in ground state
             state0 (int): start PES for particle. Should match coeff
-            deco (bool): Flag for accounting for decoherence. Defaults to False
+            deco (dict): dict with keys delta_R, delta_P. If None, dont run with decoherence
             langevin (dict): dictionary with keys damp and temp. If None, no Langevin dynamics
             seed (int): Seed to use for random number generator
 
@@ -83,9 +83,15 @@ class AFSSH():
             self.r = r0
             self.v = v0
 
-        # Initialize moments of position and velocity for decoherence
-        self.delta_R = 0
-        self.delta_P = 0
+        # Initialize moments of position and velocity for decoherence (if applicable)
+        if deco != None:
+            self.deco = True
+            self.delta_R = deco.get('delta_R')
+            self.delta_P = deco.get('delta_P')
+        else:
+            self.deco = False
+            self.delta_R = 0
+            self.delta_P = 0
 
         # Track acceleration to save time when calculating trajectory
         self.a = np.zeros(self.dim)
@@ -94,7 +100,7 @@ class AFSSH():
         if seed != None:
             rand.seed(seed)
 
-        # Handle Langevin is applicable
+        # Handle Langevin if applicable
         if langevin != None:
             self.damping = langevin.get('damp')
             self.temp = langevin.get('temp')
