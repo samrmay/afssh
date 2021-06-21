@@ -92,6 +92,7 @@ class AFSSH():
             self.deco = False
             self.delta_R = 0
             self.delta_P = 0
+        self.torque = None
 
         # Track acceleration to save time when calculating trajectory
         self.a = np.zeros(self.dim)
@@ -286,11 +287,29 @@ class AFSSH():
 
         return None
 
-    def propagate_moments(self):
+    def calc_torque(self, r):
+        F = -self.model.get_d_adiabatic_energy(r)
+        F[self.lam, :] *= 0
+        return F
+
+    def propagate_moments(self, delta_R0, delta_P0, torque0, dt_c, u_mtx, coeff, r):
         """
         unimplemented
         """
-        pass
+        sigma = coeff*np.conj(coeff)
+        U_sq = np.sum(u_mtx, axis=1)**2
+
+        delta_R = delta_R0 + (delta_P0/self.m) + \
+            (.5/self.m)*torque0*sigma*(dt_c**2)
+
+        torque1_ad = self.calc_torque(r)
+        torque1 = U_sq*sum(torque1_ad)
+        delta_P = delta_P0 + .5*(torque0 + torque1)*sigma*dt_c
+
+        delta_R_ad = U_sq*sum(delta_R)
+        delta_P_ad = U_sq*sum(delta_P)
+
+        return delta_R_ad, delta_P_ad, torque1_ad
 
     def collapse_functions(self):
         """
