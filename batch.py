@@ -6,35 +6,43 @@ import math as math
 
 
 class Batch:
-    def __init__(self, model, stopping_function, cat_function):
-        self.model = model
+    def __init__(self, stopping_function):
         self.stopping_function = stopping_function
-        self.cat_function = cat_function
 
         self.batch_state = "initiated"
         self.batch_error = None
 
-        self.start_time = time.time()
-        self.end_time = self.start_time
+        self.start_time = None
+        self.end_time = None
 
         self.states = []
 
-    def run(self, num_particles=10, start_x=-10, v=.015, max_iter=5000, debug=False, mass=2000, del_t=.5):
-        self.k = mass*(math.sqrt(np.sum(v**2)))
-        self.v = v
-        self.m = mass
-        self.del_t = del_t
-        self.max_iter = max_iter
+    def run(self, fssh_settings, num_particles=10):
+        self.model = fssh_settings.get("model")
+        self.m = fssh_settings.get("mass")
+        self.v0 = fssh_settings.get("v0")
+        self.k = self.m*(math.sqrt(np.sum(self.v**2)))
+        self.dt_c = fssh_settings.get("dt_c")
+        self.max_iter = fssh_settings.get("max_iter")
+        self.r0 = fssh_settings.get("r0")
+        self.debug = fssh_settings.get("debug")
+        self.langevin = fssh_settings.get("langevin")
+        self.deco = fssh_settings.get("deco")
+        self.e_tol = fssh_settings.get("e_tol")
+        self.coeff = fssh_settings.get("coeff")
+        self.t0 = fssh_settings.get("t0")
+        self.state0 = fssh_settings.get("state0")
+        self.seed = fssh_settings.get("seed")
+
         self.num_particles = num_particles
-        self.start_x = start_x
-        self.debug = debug
 
         try:
-            self.batch_state = "finished"
+            self.start_time = time.time()
             for i in range(num_particles):
                 print(i+1, "/", num_particles)
-                x = fssh.AFSSH(self.model, start_x, self.v, del_t, mass=mass)
-                x.run(max_iter, self.stopping_function, self.debug)
+                x = fssh.AFSSH(self.model, self.r0, self.v0, self.dt_c, self.e_tol, self.coeff,
+                               self.m, self.t0, self.state0, self.deco, self.langevin, self.seed)
+                x.run(self.max_iter, self.stopping_function, self.debug)
 
                 self.states.append(
                     (x.r, x.v, x.lam, x.t, x.coeff, x.i, x.switches))
@@ -42,6 +50,7 @@ class Batch:
             self.batch_state = "failed"
             self.batch_error = e
         finally:
+            self.batch_state = "finished"
             self.end_time = time.time()
 
     def generate_report(self, outfile):
@@ -69,11 +78,29 @@ class Batch:
             lines.append(("-"*10) + "Job parameters" + ("-"*10) + "\n")
             lines.append(f"Num particles: {self.num_particles}\n")
             lines.append(f"Max iter: {self.max_iter}\n")
-            lines.append(f"Time step: {self.del_t}\n")
+            lines.append(f"Time step: {self.dt_c}\n")
             lines.append(f"Particle momentum: {self.k}\n")
-            lines.append(f"Start position: {self.start_x}\n")
+            lines.append(f"Start position: {self.r0}\n")
             lines.append(f"Particle mass: {self.m}\n")
-            lines.append(f"Particle velocity: {self.v}\n")
+            lines.append(f"Particle velocity: {self.v0}\n")
+            lines.append(f"Start coefficients: {self.coeff}\n")
+            lines.append(f"Start state: {self.state0}\n")
+            lines.append(f"Seed: {self.seed}\n")
+
+            if self.deco != None:
+                lines.append(f"Decoherence accounted for: \n")
+                lines.append(f"Start delta_R: {self.deco.get('delta_R')}\n")
+                lines.append(f"Start delta_P: {self.deco.get('delta_P')}\n")
+            else:
+                lines.append("Decoherence calculations turned off\n")
+
+            if self.langevin != None:
+                lines.append(f"Langevin dynamics accounted for: \n")
+                lines.append(
+                    f"Damping coefficient: {self.langevin.get('damp')}\n")
+                lines.append(f"Temperature: {self.langevin.get('temp')}\n")
+            else:
+                lines.append("Langevin dynamics turned off\n")
 
             lines.append(("-"*10) + "Job results" + ("-"*10) + '\n')
             f.writelines(lines)
