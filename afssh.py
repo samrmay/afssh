@@ -314,7 +314,7 @@ class AFSSH():
 
         return delta_R_ad, delta_P_ad, torque1_ad
 
-    def calc_deco_rate(self, delta_F, delta_R, delta_P, T, pot, v):
+    def calc_deco_rate(self, delta_F, delta_R, T, pot, v):
         T_row = T[self.lam, :]
         term1 = (1/2/self.HBAR)*delta_F*(delta_R - delta_R[self.lam])
         term2 = (2/self.HBAR/np.dot(v, v))
@@ -326,11 +326,24 @@ class AFSSH():
     def calc_reset_rate(self, delta_F, delta_R):
         return (-1/2/self.HBAR)*delta_F*(delta_R - delta_R[self.lam])
 
-    def collapse_functions(self):
-        """
-        unimplemented
-        """
-        pass
+    def collapse_reset(self, deco_rate, reset_rate, coeff, delta_R, delta_P, dt_c):
+        nu = rand.random()
+        nu_v = np.zeros(self.num_states) + nu
+        should_collapse = nu_v < (1/deco_rate)*dt_c
+        should_reset = should_collapse or nu_v < (1/reset_rate)*dt_c
+
+        for i in range(self.num_states):
+            if should_collapse[i]:
+                c_lam = coeff[self.lam]
+                coeff[self.lam] = (c_lam/abs(c_lam)) * \
+                    math.sqrt((abs(c_lam)**2) + (abs(coeff[i])**2))
+                coeff[i] = 0
+
+            if should_reset[i]:
+                delta_R[i] = 0
+                delta_P[i] = 0
+
+        return coeff, delta_R, delta_P
 
     def orthogonalize(self, mtx):
         """
@@ -359,7 +372,7 @@ class AFSSH():
         dt_q = dt_c/int(round(dt_c/dt_q_prime))
 
         # Carry out quantum time steps from t0 -> t0 + dt_c by dt_q
-        # T is constant, V is varied )linearly from u0, u1
+        # T is constant, V is varied) linearly from u0, u1
         n_q = int(dt_c/dt_q)
         def u_interp(t): return u0 + ((t - t0)/dt_c)*(u1-u0)
         c0 = self.coeff
@@ -382,7 +395,8 @@ class AFSSH():
                         new_PES = i
                         break
             c0 = c
-        return c, new_PES, hop_attempted
+
+        return c, new_PES, hop_attempted, u_mtx, t_mid
 
     def step(self, dt_c, classical=False):
         """
@@ -394,24 +408,28 @@ class AFSSH():
         Returns
             success (bool): Whether energy was conserved. If False, run step again with smaller dt_c
         """
+        # Save initial values for later steps
         t0 = self.t
-
-        # Nuclear classical evolution using classical time step dt_c
         r0 = self.r
         v0 = self.v
         a0 = self.a
+        c0 = self.coeff
+
+        # Nuclear classical evolution using classical time step dt_c
         r, v, a = self.calc_traj(r0, v0, dt_c, a0)
         u0 = self.model.get_adiabatic_energy(r0)
         u1 = self.model.get_adiabatic_energy(r)
 
         # Propagate quantum effects (if applicable)
         if not classical:
-            c, new_PES, hop_attempted = self.prop_quantum(
-                r0, r, u0, u1, dt_c, t0)
-            self.coeff = c
+            result = self.prop_quantum(r0, r, u0, u1, dt_c, t0)
+            c, new_PES, hop_attempted, u_mtx, t_mid = result
         else:
             hop_attempted = False
             new_PES = self.lam
+            u_mtx = None
+            t_mid = None
+            c = self.coeff
 
         # Check energy conservation (if applicable)
         if self.e_tol != None:
@@ -430,6 +448,7 @@ class AFSSH():
                         self.r = r
                         self.v = v
                         self.a = a
+                        self.coeff = c
                         self.log_switch(self.lam, new_PES, r, v, c, 0)
                         self.lam = new_PES
                         self.delta_R = 0
@@ -480,14 +499,19 @@ class AFSSH():
 
         # Decoherence calculations (if applicable)
         if self.deco:
-            self.propagate_moments()
-            self.collapse_functions()
+            torque0 = self.calc_torque(r0)
+            del_R0 = self.delta_R
+            del_P0 = self.delta_P
+
+            del_R, del_P, torque1 = self.propagate_moments(
+                del_R0, del_P0, torque0, dt_c, u_mtx, c0, r)
 
         # Update parameters
         self.t += dt_c
         self.v = v
         self.r = r
         self.a = a
+        self.coeff = c
         return True
 
     def run(self, max_iter, stopping_fcn, debug=False):
