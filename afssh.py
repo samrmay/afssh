@@ -93,7 +93,7 @@ class AFSSH():
             self.delta_R = np.zeros(self.num_states)
             self.delta_P = np.zeros(self.num_states)
         self.torque = None
-        if len(self.delta_R) != self.dim or len(self.delta_P) != self.dim:
+        if len(self.delta_R) != self.num_states or len(self.delta_P) != self.num_states:
             raise ValueError(
                 "moment vector dimensions must match model dimension")
 
@@ -499,12 +499,12 @@ class AFSSH():
 
         # Decoherence calculations (if applicable)
         if self.deco:
-            # Step 7: evolve moments
+            # Evolve moments
             torque0 = self.calc_torque(r0)
             del_R0 = self.delta_R
             del_P0 = self.delta_P
 
-            # Step 8: Check for collapse/reset
+            # Check for collapse/reset
             result = self.propagate_moments(
                 del_R0, del_P0, torque0, dt_c, u_mtx, c0, r)
             del_R, del_P, torque1 = result
@@ -513,7 +513,7 @@ class AFSSH():
 
             result = self.collapse_reset(
                 deco_rate, reset_rate, c, del_R, del_P, dt_c)
-            c, del_P, del_R = result
+            c, self.delta_P, self.delta_R = result
 
         # Update parameters
         self.t += dt_c
@@ -521,8 +521,6 @@ class AFSSH():
         self.r = r
         self.a = a
         self.coeff = c
-        self.delta_P = del_P
-        self.delta_R = del_R
         return True
 
     def run(self, max_iter, stopping_fcn, debug=False):
