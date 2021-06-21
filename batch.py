@@ -21,7 +21,7 @@ class Batch:
         self.model = fssh_settings.get("model")
         self.m = fssh_settings.get("mass")
         self.v0 = fssh_settings.get("v0")
-        self.k = self.m*(math.sqrt(np.sum(self.v**2)))
+        self.k = self.m*(math.sqrt(np.sum(self.v0**2)))
         self.dt_c = fssh_settings.get("dt_c")
         self.max_iter = fssh_settings.get("max_iter")
         self.r0 = fssh_settings.get("r0")
@@ -37,6 +37,7 @@ class Batch:
         self.num_particles = num_particles
 
         try:
+            self.batch_state = "finished"
             self.start_time = time.time()
             for i in range(num_particles):
                 print(i+1, "/", num_particles)
@@ -50,7 +51,6 @@ class Batch:
             self.batch_state = "failed"
             self.batch_error = e
         finally:
-            self.batch_state = "finished"
             self.end_time = time.time()
 
     def generate_report(self, outfile):
@@ -69,7 +69,7 @@ class Batch:
 
         if self.batch_state == "failed":
             lines.append("Job failed...\n")
-            lines.append(str(self.batch_error))
+            lines.append(str(self.batch_error) + "\n")
             f.writelines(lines)
         elif self.batch_state == "initiated":
             lines.append("Job has not been run...\n")
