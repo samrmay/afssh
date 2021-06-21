@@ -499,12 +499,21 @@ class AFSSH():
 
         # Decoherence calculations (if applicable)
         if self.deco:
+            # Step 7: evolve moments
             torque0 = self.calc_torque(r0)
             del_R0 = self.delta_R
             del_P0 = self.delta_P
 
-            del_R, del_P, torque1 = self.propagate_moments(
+            # Step 8: Check for collapse/reset
+            result = self.propagate_moments(
                 del_R0, del_P0, torque0, dt_c, u_mtx, c0, r)
+            del_R, del_P, torque1 = result
+            deco_rate = self.calc_deco_rate(torque1, del_R, t_mid, u1, v)
+            reset_rate = self.calc_reset_rate(torque1, del_R)
+
+            result = self.collapse_reset(
+                deco_rate, reset_rate, c, del_R, del_P, dt_c)
+            c, del_P, del_R = result
 
         # Update parameters
         self.t += dt_c
