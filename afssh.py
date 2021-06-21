@@ -521,6 +521,8 @@ class AFSSH():
         self.r = r
         self.a = a
         self.coeff = c
+        self.delta_P = del_P
+        self.delta_R = del_R
         return True
 
     def run(self, max_iter, stopping_fcn, debug=False):
