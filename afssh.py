@@ -90,9 +90,12 @@ class AFSSH():
             self.delta_P = deco.get('delta_P')
         else:
             self.deco = False
-            self.delta_R = 0
-            self.delta_P = 0
+            self.delta_R = np.zeros(self.num_states)
+            self.delta_P = np.zeros(self.num_states)
         self.torque = None
+        if len(self.delta_R) != self.dim or len(self.delta_P) != self.dim:
+            raise ValueError(
+                "moment vector dimensions must match model dimension")
 
         # Track acceleration to save time when calculating trajectory
         self.a = np.zeros(self.dim)
@@ -311,6 +314,18 @@ class AFSSH():
 
         return delta_R_ad, delta_P_ad, torque1_ad
 
+    def calc_deco_rate(self, delta_F, delta_R, delta_P, T, pot, v):
+        T_row = T[self.lam, :]
+        term1 = (1/2/self.HBAR)*delta_F*(delta_R - delta_R[self.lam])
+        term2 = (2/self.HBAR/np.dot(v, v))
+        term2 *= np.dot(T_row*(-1*pot + pot[self.lam])
+                        * (delta_R - delta_R[self.lam]), v)
+
+        return 1/(term1 - term2)
+
+    def calc_reset_rate(self, delta_F, delta_R):
+        return (-1/2/self.HBAR)*delta_F*(delta_R - delta_R[self.lam])
+
     def collapse_functions(self):
         """
         unimplemented
@@ -463,7 +478,7 @@ class AFSSH():
                 self.log_switch(self.lam, new_PES, r, v, c, diff)
                 self.lam = new_PES
 
-        # Decoherence calculations (unimplemented)
+        # Decoherence calculations (if applicable)
         if self.deco:
             self.propagate_moments()
             self.collapse_functions()
