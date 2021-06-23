@@ -315,6 +315,9 @@ class AFSSH():
         return delta_R_ad, delta_P_ad, torque1_ad
 
     def calc_deco_rate(self, delta_F, delta_R, T, pot, v):
+        """
+        Returns 1/tau
+        """
         T_row = T[self.lam, :]
         term1 = (1/2/self.HBAR)*delta_F*(delta_R - delta_R[self.lam])
         term2 = np.tile(T_row*(-1*pot + pot[self.lam])*(
@@ -324,21 +327,14 @@ class AFSSH():
         term2 *= (2/self.HBAR/np.dot(v, v))
         result = term1 - term2
 
-        # Set zeroes to 1
-        result[result == 0] = 1
-        tau = 1/result
-        # Set tau_lam to 0
-        tau[self.lam] = 0
-        return tau
+        return result
 
     def calc_reset_rate(self, delta_F, delta_R):
+        """
+        Returns 1/tau_reset
+        """
         result = (-1/2/self.HBAR)*delta_F*(delta_R - delta_R[self.lam])
-        # Set zeroes to 1
-        result[result == 0] = 1
-        tau = 1/result
-        # Set tau_lam to 0
-        tau[self.lam] = 0
-        return tau
+        return result
 
     def collapse_reset(self, deco_rate, reset_rate, coeff, delta_R, delta_P, dt_c):
         nu = rand.random()
@@ -348,6 +344,7 @@ class AFSSH():
 
         for i in range(self.num_states):
             if should_collapse[i]:
+                print("collapsed: ", self.r, self.lam)
                 c_lam = coeff[self.lam]
                 coeff[self.lam] = (c_lam/abs(c_lam)) * \
                     math.sqrt((abs(c_lam)**2) + (abs(coeff[i])**2))
