@@ -293,14 +293,14 @@ class AFSSH():
     def calc_torque(self, r):
         F = -self.model.get_d_adiabatic_energy(r)
         F[self.lam, :] *= 0
-        return F
+        return np.diag(F)
 
     def propagate_moments(self, delta_R0, delta_P0, torque0, dt_c, u_mtx, coeff, r):
         """
         unimplemented
         """
         sigma = coeff*np.conj(coeff)
-        U_sq = np.sum(u_mtx, axis=1)**2
+        U_sq = np.sum(u_mtx**2, axis=1)
 
         delta_R = delta_R0 + (delta_P0/self.m) + \
             (.5/self.m)*torque0*sigma*(dt_c**2)
@@ -322,16 +322,29 @@ class AFSSH():
         term2 *= np.tile(v, (self.num_states, 1))
         term2 = mag(term2, axis=1)
         term2 *= (2/self.HBAR/np.dot(v, v))
-        return 1/(term1 - term2)
+        result = term1 - term2
+
+        # Set zeroes to 1
+        result[result == 0] = 1
+        tau = 1/result
+        # Set tau_lam to 0
+        tau[self.lam] = 0
+        return tau
 
     def calc_reset_rate(self, delta_F, delta_R):
-        return (-1/2/self.HBAR)*delta_F*(delta_R - delta_R[self.lam])
+        result = (-1/2/self.HBAR)*delta_F*(delta_R - delta_R[self.lam])
+        # Set zeroes to 1
+        result[result == 0] = 1
+        tau = 1/result
+        # Set tau_lam to 0
+        tau[self.lam] = 0
+        return tau
 
     def collapse_reset(self, deco_rate, reset_rate, coeff, delta_R, delta_P, dt_c):
         nu = rand.random()
         nu_v = np.zeros(self.num_states) + nu
-        should_collapse = nu_v < (1/deco_rate)*dt_c
-        should_reset = should_collapse or nu_v < (1/reset_rate)*dt_c
+        should_collapse = nu_v < deco_rate*dt_c
+        should_reset = np.logical_or(should_collapse, nu_v < reset_rate*dt_c)
 
         for i in range(self.num_states):
             if should_collapse[i]:
