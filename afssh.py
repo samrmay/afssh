@@ -5,8 +5,8 @@ import scipy.integrate as integrate
 import math as math
 
 
-def mag(v):
-    return np.sqrt(np.sum(np.square(v)))
+def mag(v, axis=0):
+    return np.sqrt(np.sum(np.square(v), axis=axis))
 
 
 def angle(v1, v2):
@@ -317,10 +317,11 @@ class AFSSH():
     def calc_deco_rate(self, delta_F, delta_R, T, pot, v):
         T_row = T[self.lam, :]
         term1 = (1/2/self.HBAR)*delta_F*(delta_R - delta_R[self.lam])
-        term2 = (2/self.HBAR/np.dot(v, v))
-        term2 *= np.dot(T_row*(-1*pot + pot[self.lam])
-                        * (delta_R - delta_R[self.lam]), v)
-
+        term2 = np.tile(T_row*(-1*pot + pot[self.lam])*(
+            delta_R - delta_R[self.lam]), (self.dim, 1)).T
+        term2 *= np.tile(v, (self.num_states, 1))
+        term2 = mag(term2, axis=1)
+        term2 *= (2/self.HBAR/np.dot(v, v))
         return 1/(term1 - term2)
 
     def calc_reset_rate(self, delta_F, delta_R):
