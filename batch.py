@@ -118,7 +118,7 @@ class Batch:
             lines.append(f"position: {state[0]}\n")
             lines.append(f"velocity: {state[1]}\n")
             lines.append(f"electronic state: {state[2]}\n")
-            lines.append(f"end_time: {self.del_t*state[5]}\n")
+            lines.append(f"end_time: {self.dt_c*state[5]}\n")
             lines.append(
                 f"end electronic coefficients: {state[4]}\n")
             lines.append("State switches:\n")
@@ -152,3 +152,8 @@ class Batch:
             f.write("position,velocity,electronic_state,coefficient\n")
             for state in self.states:
                 f.write(f"{state[0]},{state[1]},{state[2]},{state[4]}\n")
+
+
+class Distribution_Batch():
+    def __init__(self, stopping_function):
+        pass
