@@ -185,8 +185,8 @@ class AFSSH():
                     d += 6*U[i, j]*U[j, i]
                     d += 8*(U[i, i] + U[j, j])
                     d -= 3 * \
-                        np.einsum("i,i->", U[i, :], U[:, i]) + \
-                        np.einsum("i,i->", U[j, :], U[:, j])
+                        (np.einsum("i,i->", U[i, :], U[:, i]) +
+                         np.einsum("i,i->", U[j, :], U[:, j]))
                     if d < 0:
                         U[:, i] *= -1
                         U[:, j] *= -1
