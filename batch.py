@@ -179,13 +179,15 @@ class New_Batch():
         self.batch_error = None
         self.start_time = None
         self.end_time = None
+        self.traj_start = None
+        self.traj_end = None
 
     def run(self, num_particles, outfile, outfolder, boltzmann_vel=False, temp=None, verbose=False, seeds=None):
         self.num_particles = num_particles
         self.boltzmann_vel = boltzmann_vel
         self.temp = temp
 
-        with open(outfile) as f:
+        with open(outfile, "w") as f:
             self.write_heading(f)
 
         try:
@@ -194,35 +196,39 @@ class New_Batch():
             if boltzmann_vel:
                 v = sampling.v_sample(temp, self.m, (num_particles, self.dim))
             else:
-                v = np.zeros(self.dim) + self.v0
+                v = np.zeros((num_particles, self.dim)) + self.v0
 
             for i in range(num_particles):
+                self.traj_start = time.time()
+                print(i)
                 x = fssh.AFSSH(self.model, self.r0, v[i], self.dt_c, self.e_tol, self.coeff,
                                self.m, self.t0, self.state0, self.deco, self.langevin, seeds[i])
                 if verbose:
-                    with open(outfolder + f"/{i}") as f:
+                    with open(outfolder + f"/{i}.csv", 'w') as f:
                         def callback(fssh): return self.log_step(fssh, f)
                         x.run(self.max_iter, self.stopping_fcn,
                               self.debug, callback)
                 else:
                     x.run(self.max_iter, self.stopping_fcn, self.debug)
 
-                with open(outfile) as f:
+                self.traj_end = time.time()
+                with open(outfile, 'a') as f:
                     self.log_trajectory(x, f, i)
         except Exception as e:
+            print(e.__traceback__.tb_lineno)
             self.batch_state = "failed"
-            self.batch_error = e
+            self.batch_error = e.__str__()
         finally:
             self.end_time = time.time()
-            with open(outfile) as f:
+            with open(outfile, "a") as f:
                 lines = []
-                if self.batch_error != None:
-                    lines.append("Job completed successfully")
+                if self.batch_state == "finished":
+                    lines.append("Job completed successfully\n")
                 else:
                     lines.append("Job failed to run\n")
-                    lines.append(self.batch_error)
+                    lines.append(self.batch_error + "\n")
                 lines.append(
-                    f"Time to finish: {self.end_time - self.start_time} seconds")
+                    f"Time to finish: {self.end_time - self.start_time} seconds\n")
                 f.writelines(lines)
 
     def write_heading(self, f):
@@ -264,7 +270,8 @@ class New_Batch():
         f.writelines(lines)
 
     def log_step(self, fssh, f):
-        f.writeline(f"{fssh.r},{fssh.v},{fssh.coeff},{fssh.lam}\n")
+        if fssh.i % 25 == 0:
+            f.write(f"{fssh.r},{fssh.v},{fssh.coeff},{fssh.lam}\n")
 
     def log_trajectory(self, fssh, f, i):
         lines = []
@@ -277,7 +284,9 @@ class New_Batch():
         lines.append(f"End state: {fssh.lam}\n")
         lines.append(f"End time: {fssh.t}\n")
         lines.append(f"Seed: {fssh.seed}\n")
-        lines.append("===State switches===")
+        lines.append(
+            f"Time to end: {self.traj_end - self.traj_start} seconds\n")
+        lines.append("===State switches===\n")
         for s in fssh.switches:
             lines.append(f"old_state: {s.get('old_state')}, ")
             lines.append(f"new_state: {s.get('new_state')}, ")
@@ -286,5 +295,5 @@ class New_Batch():
             lines.append(f"coefficients: {s.get('coefficients')}, ")
             lines.append(f"delta_v: {s.get('delta_v')}, ")
             lines.append(f"success: {s.get('success')}\n")
-        lines.append("===End state switches===")
+        lines.append("===End state switches===\n")
         f.writelines(lines)
