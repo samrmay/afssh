@@ -79,9 +79,11 @@ class AFSSH():
         if self.dim == 1:
             self.r = np.array([r0])
             self.v = np.array([v0])
+            self.v0 = np.array([v0])
         else:
             self.r = r0
             self.v = v0
+            self.v0 = v0
 
         # Initialize moments of position and velocity for decoherence (if applicable)
         if deco != None:
@@ -344,7 +346,6 @@ class AFSSH():
 
         for i in range(self.num_states):
             if should_collapse[i]:
-                print("collapsed: ", self.r, self.lam)
                 c_lam = coeff[self.lam]
                 coeff[self.lam] = (c_lam/abs(c_lam)) * \
                     math.sqrt((abs(c_lam)**2) + (abs(coeff[i])**2))
@@ -534,12 +535,12 @@ class AFSSH():
         self.coeff = c
         return True
 
-    def run(self, max_iter, stopping_fcn, debug=False):
+    def run(self, max_iter, stopping_fcn, debug=False, callback=lambda _: _):
         for i in range(max_iter):
             if not self.step(self.dt_c):
                 # Need to rerun step with smaller step size
                 self.step(int(self.dt_c/2))
-
+            callback(self)
             if (debug and i % 100 == 0):
                 print(self.r, self.v, self.calc_KE(self.v))
 
