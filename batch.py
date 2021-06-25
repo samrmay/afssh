@@ -271,7 +271,12 @@ class New_Batch():
 
     def log_step(self, fssh, f):
         if fssh.i % 25 == 0:
-            f.write(f"{fssh.r},{fssh.v},{fssh.coeff},{fssh.lam}\n")
+            np.savetxt(f, fssh.r, newline="|")
+            f.write(",")
+            np.savetxt(f, fssh.v, newline="|")
+            f.write(",")
+            np.savetxt(f, fssh.coeff, newline="|")
+            f.write(f",{fssh.lam}\n")
 
     def log_trajectory(self, fssh, f, i):
         lines = []
