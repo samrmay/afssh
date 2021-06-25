@@ -134,7 +134,7 @@ class AFSSH():
         r = r0 + half_v*del_t
         a = -self.model.get_d_adiabatic_energy(r)[self.lam]/self.m
         if self.langevin:
-            a += -self.damping*half_v + (self.rand_force(del_t)/self.m)
+            a = a - self.damping*half_v + (self.rand_force(del_t)/self.m)
         v = half_v + .5*a*del_t
         return r, v, a
 
