@@ -3,6 +3,7 @@ from datetime import date
 import time
 import numpy as np
 import math as math
+import boltzmann_sampling as sampling
 
 
 class Batch:
@@ -154,6 +155,136 @@ class Batch:
                 f.write(f"{state[0]},{state[1]},{state[2]},{state[4]}\n")
 
 
-class Distribution_Batch():
-    def __init__(self, stopping_function):
-        pass
+class New_Batch():
+    def __init__(self, fssh_settings, stopping_fcn):
+        self.model = fssh_settings.get("model")
+        self.m = fssh_settings.get("mass")
+        self.v0 = fssh_settings.get("v0")
+        self.k = self.m*(math.sqrt(np.sum(self.v0**2)))
+        self.dt_c = fssh_settings.get("dt_c")
+        self.max_iter = fssh_settings.get("max_iter")
+        self.r0 = fssh_settings.get("r0")
+        self.debug = fssh_settings.get("debug")
+        self.langevin = fssh_settings.get("langevin")
+        self.deco = fssh_settings.get("deco")
+        self.e_tol = fssh_settings.get("e_tol")
+        self.coeff = fssh_settings.get("coeff")
+        self.t0 = fssh_settings.get("t0")
+        self.state0 = fssh_settings.get("state0")
+
+        self.stopping_fcn = stopping_fcn
+        self.dim = len(self.r0) if hasattr(self.r0, "__len__") else 1
+
+        self.batch_state = "initiated"
+        self.batch_error = None
+        self.start_time = None
+        self.end_time = None
+
+    def run(self, num_particles, outfile, outfolder, boltzmann_vel=False, temp=None, verbose=False, seeds=None):
+        self.num_particles = num_particles
+        self.boltzmann_vel = boltzmann_vel
+        self.temp = temp
+
+        with open(outfile) as f:
+            self.write_heading(f)
+
+        try:
+            self.batch_state = "finished"
+            self.start_time = time.time()
+            if boltzmann_vel:
+                v = sampling.v_sample(temp, self.m, (num_particles, self.dim))
+            else:
+                v = np.zeros(self.dim) + self.v0
+
+            for i in range(num_particles):
+                x = fssh.AFSSH(self.model, self.r0, v[i], self.dt_c, self.e_tol, self.coeff,
+                               self.m, self.t0, self.state0, self.deco, self.langevin, seeds[i])
+                if verbose:
+                    with open(outfolder + f"/{i}") as f:
+                        def callback(fssh): return self.log_step(fssh, f)
+                        x.run(self.max_iter, self.stopping_fcn,
+                              self.debug, callback)
+                else:
+                    x.run(self.max_iter, self.stopping_fcn, self.debug)
+
+                with open(outfile) as f:
+                    self.log_trajectory(x, f, i)
+        except Exception as e:
+            self.batch_state = "failed"
+            self.batch_error = e
+        finally:
+            self.end_time = time.time()
+            with open(outfile) as f:
+                lines = []
+                if self.batch_error != None:
+                    lines.append("Job completed successfully")
+                else:
+                    lines.append("Job failed to run\n")
+                    lines.append(self.batch_error)
+                lines.append(
+                    f"Time to finish: {self.end_time - self.start_time} seconds")
+                f.writelines(lines)
+
+    def write_heading(self, f):
+        lines = []
+        lines.append(date.today().isoformat())
+        lines.append(f"\nJob state: {self.batch_state}\n")
+        lines.append(f"Potential model: {type(self.model).__name__}\n")
+        lines.append(("-"*10) + "Job parameters" + ("-"*10) + "\n")
+        lines.append(f"Num particles: {self.num_particles}\n")
+        lines.append(f"Max iter: {self.max_iter}\n")
+        lines.append(f"Time step: {self.dt_c}\n")
+        lines.append(f"Particle momentum: {self.k}\n")
+        lines.append(f"Start position: {self.r0}\n")
+        lines.append(f"Particle mass: {self.m}\n")
+        lines.append(f"Particle velocity: {self.v0}\n")
+        lines.append(f"Start coefficients: {self.coeff}\n")
+        lines.append(f"Start state: {self.state0}\n")
+
+        if self.deco != None:
+            lines.append(f"Decoherence accounted for: \n")
+            lines.append(f"Start delta_R: {self.deco.get('delta_R')}\n")
+            lines.append(f"Start delta_P: {self.deco.get('delta_P')}\n")
+        else:
+            lines.append("Decoherence calculations turned off\n")
+
+        if self.langevin != None:
+            lines.append(f"Langevin dynamics accounted for: \n")
+            lines.append(
+                f"Damping coefficient: {self.langevin.get('damp')}\n")
+            lines.append(f"Temperature: {self.langevin.get('temp')}\n")
+        else:
+            lines.append("Langevin dynamics turned off\n")
+
+        if self.boltzmann_vel:
+            lines.append(
+                f"Initializing velocities from Boltzmann Distribution\n")
+
+        lines.append(("-"*10) + "Job results" + ("-"*10) + '\n')
+        f.writelines(lines)
+
+    def log_step(self, fssh, f):
+        f.writeline(f"{fssh.r},{fssh.v},{fssh.coeff},{fssh.lam}\n")
+
+    def log_trajectory(self, fssh, f, i):
+        lines = []
+        lines.append(str(i) + "\n")
+        lines.append(f"Start velocity: {fssh.v0}\n")
+        lines.append(f"End position: {fssh.r}\n")
+        lines.append(f"End velocity: {fssh.v}\n")
+        lines.append(f"End coefficients: {fssh.coeff}\n")
+        lines.append(f"End KE: {fssh.calc_KE(fssh.v)}")
+        lines.append(f"End state: {fssh.lam}\n")
+        lines.append(f"End time: {fssh.t}\n")
+        lines.append(f"Seed: {fssh.seed}\n")
+        lines.append("===State switches===")
+        for s in fssh.switches:
+            lines.append(f"old_state: {s.get('old_state')}, ")
+            lines.append(f"new_state: {s.get('new_state')}, ")
+            lines.append(f"position: {s.get('position')}, ")
+            lines.append(f"velocity: {s.get('velocity')}, ")
+            lines.append(f"coefficients: {s.get('coefficients')}, ")
+            lines.append(f"delta_v: {s.get('delta_v')}, ")
+            lines.append(f"success: {s.get('success')}\n")
+        lines.append("===End state switches===")
+        f.writelines(lines)
