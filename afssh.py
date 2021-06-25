@@ -22,7 +22,7 @@ def quadratic(a, b, c):
 
 class AFSSH():
     """
-    Class to carry out Augmented Fewest Switches Surface Hopping algorithm. 
+    Class to carry out Augmented Fewest Switches Surface Hopping algorithm.
     Closely follows http://dx.doi.org/10.1021/acs.jctc.6b00673 and equation references are from this paper
     """
 
@@ -43,7 +43,7 @@ class AFSSH():
             seed (int): Seed to use for random number generator
 
         Returns
-            AFFSH: Class to propagate particle 
+            AFFSH: Class to propagate particle
         """
         self.model = model
         self.m = mass
@@ -103,6 +103,7 @@ class AFSSH():
         self.a = np.zeros(self.dim)
 
         # Initialize seed if given
+        self.seed = seed
         if seed != None:
             rand.seed(seed)
 
@@ -162,10 +163,12 @@ class AFSSH():
         ev1 = self.model.get_wave_function(r1)
 
         # Calculate u_mtx, ensuring positive diagonal (eq. 5)
-        U = np.zeros((self.num_states, self.num_states))
-        for i in range(self.num_states):
-            for j in range(self.num_states):
-                U[i, j] = ev0[:, i]@ev1[:, j]
+        U = np.einsum("ij,ik->jk", ev0, ev1)
+        # Old method with loop
+        # U = np.zeros((self.num_states, self.num_states))
+        # for i in range(self.num_states):
+        #     for j in range(self.num_states):
+        #         U[i, j] = ev0[:, i]@ev1[:, j]
 
         # If determinant of U is -1, flip phase of first eigenvector for r1
         # (flip first column of U)
@@ -181,8 +184,9 @@ class AFSSH():
                     d = 3*((U[i, i]**2) + (U[j, j]**2))
                     d += 6*U[i, j]*U[j, i]
                     d += 8*(U[i, i] + U[j, j])
-                    d -= 3*sum([(U[i, l]*U[l, i]) + (U[j, l]*U[l, j])
-                               for l in range(self.num_states)])
+                    d -= 3 * \
+                        np.einsum("i,i->", U[i, :], U[:, i]) + \
+                        np.einsum("i,i->", U[j, :], U[:, j])
                     if d < 0:
                         U[:, i] *= -1
                         U[:, j] *= -1
@@ -217,18 +221,17 @@ class AFSSH():
         Parameters:
             t0 (int): initial time
             t1 (int): end time
-            V (func): function that takes in single argument t and returns potential matrix at time t. 
+            V (func): function that takes in single argument t and returns potential matrix at time t.
             Paper suggests linear interpolation between potential at times t0 and t1
-            T (iterable): time derivative matrix
+            T (ndarray): time derivative matrix
             coeff0: intial coefficients at time t0
 
         Returns
             coeff (ndarray): coefficients integrated from t0 to t1
         """
         def f(t, c):
-            energy = V(t)
-            summation = np.sum(T*np.tile(c, (self.num_states, 1)), axis=1)
-            return (energy*c/1j/self.HBAR) - summation
+            # old (slower) method: np.sum(T*np.tile(c, (self.num_states, 1)), axis=1)
+            return (V(t)*c/1j/self.HBAR) - np.einsum("j,ij->i", c, T)
 
         result = integrate.solve_ivp(f, (t0, t1), coeff0)
         return result.y[:, -1]
@@ -377,7 +380,7 @@ class AFSSH():
         # Determine dt_q (eq. 20, 21)
         u = self.model.get_adiabatic_energy((r + r0)/2)
         dt_q_prime = min(dt_c, .02/np.max(np.absolute(t_mid)))
-        # Check that V here is correct (using V at x0)
+        # Definition of bold V under eq. 16
         dt_q_prime = min(dt_q_prime, .02*self.HBAR /
                          np.max(np.absolute(u - np.average(u))))
 
@@ -537,6 +540,7 @@ class AFSSH():
 
     def run(self, max_iter, stopping_fcn, debug=False, callback=lambda _: _):
         for i in range(max_iter):
+            self.i = i
             if not self.step(self.dt_c):
                 # Need to rerun step with smaller step size
                 self.step(int(self.dt_c/2))
