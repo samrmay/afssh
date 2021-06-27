@@ -4,6 +4,8 @@ import time
 import numpy as np
 import math as math
 import boltzmann_sampling as sampling
+from multiprocessing import Pool
+import os
 
 
 class Batch:
@@ -179,10 +181,8 @@ class New_Batch():
         self.batch_error = None
         self.start_time = None
         self.end_time = None
-        self.traj_start = None
-        self.traj_end = None
 
-    def run(self, num_particles, outfile, outfolder, boltzmann_vel=False, temp=None, verbose=False, seeds=None):
+    def run(self, num_particles, outfile, outfolder, num_cores=1, boltzmann_vel=False, temp=None, verbose=False, seeds=None):
         self.num_particles = num_particles
         self.boltzmann_vel = boltzmann_vel
         self.temp = temp
@@ -198,22 +198,36 @@ class New_Batch():
             else:
                 v = np.zeros((num_particles, self.dim)) + self.v0
 
-            for i in range(num_particles):
-                self.traj_start = time.time()
-                print(i)
-                x = fssh.AFSSH(self.model, self.r0, v[i], self.dt_c, self.e_tol, self.coeff,
-                               self.m, self.t0, self.state0, self.deco, self.langevin, seeds[i])
-                if verbose:
-                    with open(outfolder + f"/{i}.csv", 'w') as f:
-                        def callback(fssh): return self.log_step(fssh, f)
-                        x.run(self.max_iter, self.stopping_fcn,
-                              self.debug, callback)
-                else:
-                    x.run(self.max_iter, self.stopping_fcn, self.debug)
+            num_loops = int(num_particles/num_cores)
 
-                self.traj_end = time.time()
-                with open(outfile, 'a') as f:
-                    self.log_trajectory(x, f, i)
+            for i in range(num_loops):
+                if num_cores > 1:
+                    pool = Pool()
+                    results = []
+                    # Run async
+                    for j in range(num_cores):
+                        index = (i*num_cores) + j
+                        temp = f"{index}.tmp"
+                        args = [index, v[index], temp,
+                                seeds[index], verbose, outfolder]
+                        results.append(pool.apply_async(self.run_traj, args))
+
+                    # Wait until all are done
+                    for j in range(num_cores):
+                        results[j].wait()
+
+                    # Collate temp files into main outfile
+                    for j in range(num_cores):
+                        index = (i*num_cores) + j
+                        temp = f"{index}.tmp"
+                        with open(outfile, 'a') as out, open(f"{index}.tmp", "r") as infile:
+                            out.writelines(infile.readlines())
+                        os.remove(temp)
+
+                else:
+                    self.run_traj(
+                        index, v[index], outfile, seed=seeds[index], verbose=verbose, outfolder=outfolder)
+
         except Exception as e:
             print(e.__traceback__.tb_lineno)
             self.batch_state = "failed"
@@ -278,19 +292,19 @@ class New_Batch():
             np.savetxt(f, fssh.coeff, newline="|")
             f.write(f",{fssh.lam}\n")
 
-    def log_trajectory(self, fssh, f, i):
+    def log_trajectory(self, fssh, f, i, traj_time):
         lines = []
         lines.append(str(i) + "\n")
         lines.append(f"Start velocity: {fssh.v0}\n")
         lines.append(f"End position: {fssh.r}\n")
         lines.append(f"End velocity: {fssh.v}\n")
         lines.append(f"End coefficients: {fssh.coeff}\n")
-        lines.append(f"End KE: {fssh.calc_KE(fssh.v)}")
+        lines.append(f"End KE: {fssh.calc_KE(fssh.v)}\n")
         lines.append(f"End state: {fssh.lam}\n")
         lines.append(f"End time: {fssh.t}\n")
         lines.append(f"Seed: {fssh.seed}\n")
         lines.append(
-            f"Time to end: {self.traj_end - self.traj_start} seconds\n")
+            f"Time to end: {traj_time} seconds\n")
         lines.append("===State switches===\n")
         for s in fssh.switches:
             lines.append(f"old_state: {s.get('old_state')}, ")
@@ -302,3 +316,20 @@ class New_Batch():
             lines.append(f"success: {s.get('success')}\n")
         lines.append("===End state switches===\n")
         f.writelines(lines)
+
+    def run_traj(self, i, v, outfile, seed=None, verbose=False, outfolder=None):
+        t_start = time.time()
+        print(i)
+        x = fssh.AFSSH(self.model, self.r0, v, self.dt_c, self.e_tol, self.coeff,
+                       self.m, self.t0, self.state0, self.deco, self.langevin, seed)
+        if verbose:
+            with open(outfolder + f"/{i}.csv", 'w') as f:
+                def callback(fssh): return self.log_step(fssh, f)
+                x.run(self.max_iter, self.stopping_fcn,
+                      self.debug, callback)
+        else:
+            x.run(self.max_iter, self.stopping_fcn, self.debug)
+
+        t_end = time.time()
+        with open(outfile, 'a') as f:
+            self.log_trajectory(x, f, i, t_end-t_start)
