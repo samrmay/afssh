@@ -186,6 +186,10 @@ class New_Batch():
         self.num_particles = num_particles
         self.boltzmann_vel = boltzmann_vel
         self.temp = temp
+        if seeds == None:
+            seeds = [None] * num_particles
+        elif len(seeds) < num_particles:
+            seeds += [None] * (num_particles - len(seeds))
 
         with open(outfile, "w") as f:
             self.write_heading(f)
