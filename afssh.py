@@ -74,19 +74,19 @@ class AFSSH():
             self.coeff = coeff
 
         # Initialize position and ensure matches model
-        self.dim = len(r0) if hasattr(r0, "__len__") else 1
+        if not hasattr(r0, "__len__"):
+            self.r = np.array([r0])
+        if not hasattr(v0, "__len__"):
+            self.v = np.array([v0])
+            self.v0 = np.array([v0])
+        self.r = r0
+        self.v = v0
+        self.v0 = v0
+
+        self.dim = len(r0)
         if self.dim != model.dim:
             raise ValueError(
                 "position vector dimension must match model dimension")
-
-        if self.dim == 1:
-            self.r = np.array([r0])
-            self.v = np.array([v0])
-            self.v0 = np.array([v0])
-        else:
-            self.r = r0
-            self.v = v0
-            self.v0 = v0
 
         # Initialize moments of position and velocity for decoherence (if applicable)
         if deco != None:
