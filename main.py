@@ -31,6 +31,7 @@ def parse_infile(inpath):
         "temp": None,
         "seeds": None,
         "num_cores": 1,
+        "verbose": False
     }
 
     flags = lines.split("%")
@@ -139,6 +140,7 @@ def parse_infile(inpath):
             settings["t0"] = float(flag[1])
         elif arg == "state0":
             settings["state0"] = int(flag[1])
+
         elif arg == "num_particles":
             b_settings["num_particles"] = int(flag[1])
         elif arg == "boltzmann_vel":
@@ -148,7 +150,14 @@ def parse_infile(inpath):
         elif arg == "num_cores":
             b_settings["num_cores"] = int(flag[1])
         elif arg == "seeds":
-            pass
+            arr = []
+            for seed in flag[1:]:
+                if seed == "end":
+                    break
+                arr.append(int(seed))
+            b_settings["seeds"] = np.array(arr)
+        elif arg == "verbose":
+            b_settings["verbose"] = bool(flag[1])
         else:
             raise ValueError(f"Unrecognized flag '{arg}'")
 
