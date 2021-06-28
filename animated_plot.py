@@ -4,7 +4,7 @@ import stopping_functions as fcns
 import matplotlib.pyplot as plt
 import matplotlib.animation as animation
 
-f = fcns.basic_1d(-8, 8)
+f = fcns.basic_1d(-10, 10)
 
 
 def animate_1d(fssh, fig, ax, stopping_function=f, min_x=-10, max_x=10, interval=.5, num_points=400):
@@ -30,7 +30,7 @@ def animate_1d(fssh, fig, ax, stopping_function=f, min_x=-10, max_x=10, interval
         return point, v_text, e_text
 
     ani = animation.FuncAnimation(
-        fig, animate, interval=interval, blit=True, save_count=0)
+        fig, animate, interval=interval, blit=True, repeat=True)
     return ani
 
 
