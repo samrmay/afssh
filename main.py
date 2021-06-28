@@ -59,6 +59,8 @@ def parse_infile(inpath):
                 m = models.Extended_Coupling_With_Reflection(**keyword_args)
             elif model_name == "nspinboson":
                 m = models.NState_Spin_Boson(**keyword_args)
+
+            settings["model"] = m
         elif arg == "mass":
             settings["mass"] = float(flag[1])
         elif arg == "velocity":
@@ -82,9 +84,39 @@ def parse_infile(inpath):
         elif arg == "debug":
             settings["debug"] = bool(flag[1])
         elif arg == "langevin":
-            pass
+            lan = {
+                "temp": 298.15,
+                "damp": 1e-4
+            }
+            for i in range(len(flag)):
+                item = flag[i]
+                if item == "temp":
+                    lan["temp"] = flag[i+1]
+                if item == "damp":
+                    lan["damp"] = flag[i+1]
+
+            settings["langevin"] = lan
         elif arg == "deco":
-            pass
+            deco = {
+                "delta_R": 0,
+                "delta_P": 0
+            }
+            key = None
+            arr = []
+            for item in flag:
+                if item == "delta_r":
+                    key = "delta_R"
+                elif item == "delta_p":
+                    key = "delta_P"
+                elif item == "end":
+                    if key != None:
+                        deco[key] = np.array(arr)
+                        key = None
+                        arr = []
+                else:
+                    arr += [float(item)]
+            
+            settings["deco"] = deco
         elif arg == "e_tol" or arg == "tolerance":
             settings["e_tol"] = float(flag[1])
         elif arg == "coeff":
@@ -92,7 +124,7 @@ def parse_infile(inpath):
             for state in range(1, len(flag) - 1):
                 if flag[dim] == "end":
                     break
-                coeff.append(float(flag[dim]))
+                coeff.append(float(flag[state]))
             settings["coeff"] = np.array(coeff)
         elif arg == "t0":
             settings["t0"] = flag[1]
