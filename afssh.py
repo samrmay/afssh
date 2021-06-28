@@ -16,7 +16,10 @@ def angle(v1, v2):
 
 
 def quadratic(a, b, c):
-    p2 = math.sqrt((b**2) - 4*a*c)
+    try:
+        p2 = math.sqrt((b**2) - 4*a*c)
+    except:
+        p2 = 0
     return (-b + p2)/2/a, (-b - p2)/2/a
 
 
