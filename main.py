@@ -115,7 +115,7 @@ def parse_infile(inpath):
                         arr = []
                 else:
                     arr += [float(item)]
-            
+
             settings["deco"] = deco
         elif arg == "e_tol" or arg == "tolerance":
             settings["e_tol"] = float(flag[1])
@@ -130,6 +130,60 @@ def parse_infile(inpath):
             settings["t0"] = flag[1]
         elif arg == "state0":
             settings["state0"] = flag[1]
+
+    return settings
+
+
+def check_settings(settings):
+    m = settings["model"]
+    dim = m.dim
+
+    # Check position and velocity vectors
+    for key in ["v0", "r0"]:
+        val = settings[key]
+        if hasattr(val, "__len__"):
+            val_dim = len(val)
+        else:
+            val_dim = 1
+            settings[key] = np.array([val])
+
+        if val_dim > dim:
+            settings[key] = settings[key][:dim]
+        elif val_dim < dim:
+            settings[key] = np.concatenate(
+                settings[key], np.zeros(dim - val_dim))
+
+    # Check coeff and state0
+    num_states = m.num_states
+    coeff = settings["coeff"]
+    if coeff != None:
+        if len(coeff) > num_states:
+            settings["coeff"] = coeff[:num_states]
+        elif len(coeff) < num_states:
+            settings["coeff"] = np.concatenate(
+                coeff, np.zeros(num_states - len(coeff)))
+
+    settings["state0"] = max(settings["state0"], num_states-1)
+    settings["state0"] = min(settings["state0"], 0)
+
+    # Check decoherence
+    deco = settings["deco"]
+    for key in ["delta_R", "delta_P"]:
+        val = deco[key]
+
+        if hasattr(val, "__len__"):
+            val_dim = len(val)
+        else:
+            val_dim = 1
+            deco[key] = np.array([val])
+
+        if val_dim > dim:
+            deco[key] = deco[key][:dim]
+        elif val_dim < dim:
+            deco[key] = np.concatenate(
+                deco[key], np.zeros(dim - val_dim))
+
+    settings["deco"] = deco
 
     return settings
 
