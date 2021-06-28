@@ -198,22 +198,23 @@ def check_settings(settings):
 
     # Check decoherence
     deco = settings["deco"]
-    for key in ["delta_R", "delta_P"]:
-        val = deco[key]
+    if deco != None:
+        for key in ["delta_R", "delta_P"]:
+            val = deco[key]
 
-        if hasattr(val, "__len__"):
-            val_dim = len(val)
-        else:
-            val_dim = 1
-            deco[key] = np.array([val])
+            if hasattr(val, "__len__"):
+                val_dim = len(val)
+            else:
+                val_dim = 1
+                deco[key] = np.array([val])
 
-        if val_dim > dim:
-            deco[key] = deco[key][:dim]
-        elif val_dim < dim:
-            deco[key] = np.concatenate(
-                deco[key], np.zeros(dim - val_dim))
+            if val_dim > dim:
+                deco[key] = deco[key][:dim]
+            elif val_dim < dim:
+                deco[key] = np.concatenate(
+                    deco[key], np.zeros(dim - val_dim))
 
-    settings["deco"] = deco
+        settings["deco"] = deco
 
     return settings
 
