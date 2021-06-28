@@ -3,6 +3,7 @@ import models as models
 import argparse
 import re
 import numpy as np
+import stopping_functions as fcns
 
 
 def parse_infile(inpath):
@@ -79,20 +80,20 @@ def parse_infile(inpath):
                 if flag[dim] == "end":
                     break
                 v.append(float(flag[dim]))
-            settings["v0"] = np.array(v)
+            settings["v0"] = np.array(v, dtype=float)
         elif arg == "pos" or arg == "position":
             r = []
             for dim in range(1, len(flag) - 1):
                 if flag[dim] == "end":
                     break
                 r.append(float(flag[dim]))
-            settings["r0"] = np.array(r)
+            settings["r0"] = np.array(r, dtype=float)
         elif arg == "dt_c":
             settings["dt_c"] = int(flag[1])
         elif arg == "max_iter" or arg == "iter":
             settings["max_iter"] = int(flag[1])
         elif arg == "debug":
-            settings["debug"] = bool(flag[1])
+            settings["debug"] = bool(int(flag[1]))
         elif arg == "langevin":
             lan = {
                 "temp": 298.15,
@@ -101,9 +102,9 @@ def parse_infile(inpath):
             for i in range(len(flag)):
                 item = flag[i]
                 if item == "temp":
-                    lan["temp"] = flag[i+1]
+                    lan["temp"] = float(flag[i+1])
                 if item == "damp":
-                    lan["damp"] = flag[i+1]
+                    lan["damp"] = float(flag[i+1])
 
             settings["langevin"] = lan
         elif arg == "deco":
@@ -120,7 +121,7 @@ def parse_infile(inpath):
                     key = "delta_P"
                 elif item == "end":
                     if key != None:
-                        deco[key] = np.array(arr)
+                        deco[key] = np.array(arr, dtype=float)
                         key = None
                         arr = []
                 else:
@@ -135,7 +136,7 @@ def parse_infile(inpath):
                 if flag[dim] == "end":
                     break
                 coeff.append(float(flag[state]))
-            settings["coeff"] = np.array(coeff)
+            settings["coeff"] = np.array(coeff, dtype=complex)
         elif arg == "t0":
             settings["t0"] = float(flag[1])
         elif arg == "state0":
@@ -144,7 +145,7 @@ def parse_infile(inpath):
         elif arg == "num_particles":
             b_settings["num_particles"] = int(flag[1])
         elif arg == "boltzmann_vel":
-            b_settings["boltzmann_vel"] = bool(flag[1])
+            b_settings["boltzmann_vel"] = bool(int(flag[1]))
         elif arg == "temp":
             b_settings["temp"] = float(flag[1])
         elif arg == "num_cores":
@@ -155,9 +156,9 @@ def parse_infile(inpath):
                 if seed == "end":
                     break
                 arr.append(int(seed))
-            b_settings["seeds"] = np.array(arr)
+            b_settings["seeds"] = np.array(arr, dtype=int)
         elif arg == "verbose":
-            b_settings["verbose"] = bool(flag[1])
+            b_settings["verbose"] = bool(int(flag[1]))
         else:
             raise ValueError(f"Unrecognized flag '{arg}'")
 
@@ -175,7 +176,7 @@ def check_settings(settings):
             val_dim = len(val)
         else:
             val_dim = 1
-            settings[key] = np.array([val])
+            settings[key] = np.array([val], dtype=float)
 
         if val_dim > dim:
             settings[key] = settings[key][:dim]
@@ -193,8 +194,8 @@ def check_settings(settings):
             settings["coeff"] = np.concatenate(
                 coeff, np.zeros(num_states - len(coeff)))
 
-    settings["state0"] = max(settings["state0"], num_states-1)
-    settings["state0"] = min(settings["state0"], 0)
+    settings["state0"] = min(settings["state0"], num_states-1)
+    settings["state0"] = max(settings["state0"], 0)
 
     # Check decoherence
     deco = settings["deco"]
@@ -229,7 +230,7 @@ if __name__ == "__main__":
     try:
         settings, bs = parse_infile(args.infile)
         settings = check_settings(settings)
-        bat = batch.New_Batch(settings, lambda _: _)
+        bat = batch.New_Batch(settings, fcns.reached_ground)
         num_particles = bs["num_particles"]
         del bs["num_particles"]
         bat.run(num_particles, args.outfile, args.outfolder, **bs)
