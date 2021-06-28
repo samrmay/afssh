@@ -214,7 +214,7 @@ class New_Batch():
 
                     # Wait until all are done
                     for j in range(num_cores):
-                        results[j].wait()
+                        results[j].get()
 
                     # Collate temp files into main outfile
                     for j in range(num_cores):
