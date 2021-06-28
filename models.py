@@ -60,11 +60,11 @@ class Diabatic_Model:
 
 
 class Simple_Avoided_Crossing(Diabatic_Model):
-    def __init__(self, A=0.01, B=1.6, C=0.005, D=1.0, discont=0):
-        self.A = A
-        self.B = B
-        self.C = C
-        self.D = D
+    def __init__(self, a=0.01, b=1.6, c=0.005, d=1.0, discont=0):
+        self.A = a
+        self.B = b
+        self.C = c
+        self.D = d
         self.discont = discont
         self.num_states = 2
 
@@ -94,12 +94,12 @@ class Simple_Avoided_Crossing(Diabatic_Model):
 
 
 class Double_Avoided_Crossing(Diabatic_Model):
-    def __init__(self, A=.1, B=.28, E0=.05, C=.015, D=.06):
-        self.A = A
-        self.B = B
-        self.E0 = E0
-        self.C = C
-        self.D = D
+    def __init__(self, a=.1, b=.28, e0=.05, c=.015, d=.06):
+        self.A = a
+        self.B = b
+        self.E0 = e0
+        self.C = c
+        self.D = d
         self.num_states = 2
 
         super().__init__(self.num_states)
@@ -120,10 +120,10 @@ class Double_Avoided_Crossing(Diabatic_Model):
 
 
 class Extended_Coupling_With_Reflection(Diabatic_Model):
-    def __init__(self, A=6e-4, B=.1, C=.9, discont=0):
-        self.A = A
-        self.B = B
-        self.C = C
+    def __init__(self, a=6e-4, b=.1, c=.9, discont=0):
+        self.A = a
+        self.B = b
+        self.C = c
         self.discont = discont
         self.num_states = 2
 
@@ -155,10 +155,10 @@ class Coupled_Osc1d(Diabatic_Model):
     From Landry and Subotnik 2011 https://doi.org/10.1063/1.3663870
     """
 
-    def __init__(self, omega=3.5e-4, Er=2.39e-2, E0=1.5e-2, coup=1.49e-5, mass=2000):
+    def __init__(self, omega=3.5e-4, er=2.39e-2, e0=1.5e-2, coup=1.49e-5, mass=2000):
         self.omega = omega
-        self.Er = Er
-        self.E0 = E0
+        self.Er = er
+        self.E0 = e0
         self.coup = coup
         self.mass = mass
         self.M = np.sqrt(self.Er*self.mass*(self.omega**2)/2)
@@ -186,10 +186,10 @@ class Coupled_Osc1d(Diabatic_Model):
 
 
 class Coupled_Osc2d(Diabatic_Model):
-    def __init__(self, omega=3.5e-4, Er=2.39e-2, E0=1.5e-2, coup=1.49e-5, mass=2000):
+    def __init__(self, omega=3.5e-4, er=2.39e-2, e0=1.5e-2, coup=1.49e-5, mass=2000):
         self.omega = omega
-        self.Er = Er
-        self.E0 = E0
+        self.Er = er
+        self.E0 = e0
         self.coup = coup
         self.mass = mass
         self.M = np.sqrt(self.Er*self.mass*(self.omega**2)/2)
@@ -206,10 +206,10 @@ class Coupled_Osc2d(Diabatic_Model):
 
 
 class NState_Spin_Boson(Diabatic_Model):
-    def __init__(self, omega=3.5e-4, Er=2.39e-2, E0=1.5e-2, coup=1.49e-5, mass=2000, l_states=1, r_states=1):
+    def __init__(self, omega=3.5e-4, er=2.39e-2, e0=1.5e-2, coup=1.49e-5, mass=2000, l_states=1, r_states=1):
         self.omega = omega
-        self.Er = Er
-        self.E0 = E0
+        self.Er = er
+        self.E0 = e0
         self.coup = coup
         self.mass = mass
         self.M = np.sqrt(self.Er*self.mass*(self.omega**2)/2)
@@ -217,7 +217,7 @@ class NState_Spin_Boson(Diabatic_Model):
         self.l_states = l_states
         self.r_states = r_states
         self.num_states = l_states + r_states
-        self.d = E0
+        self.d = e0
 
         super().__init__(self.num_states)
 
@@ -285,7 +285,8 @@ def plot_2d(ax, model, x_linspace, y_linspace, colors):
     V = np.zeros((l, l, model.num_states))
     for i in range(l):
         for j in range(l):
-            V[j, i] = model.get_adiabatic_energy(np.asarray([xx[j, i], yy[j, i]]))
+            V[j, i] = model.get_adiabatic_energy(
+                np.asarray([xx[j, i], yy[j, i]]))
 
     for i in range(model.num_states):
         ax.plot_wireframe(xx, yy, V[:, :, i], color=colors[i])
