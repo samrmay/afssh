@@ -24,6 +24,15 @@ def parse_infile(inpath):
         "t0": 0,
         "state0": 0
     }
+
+    b_settings = {
+        "num_particles": 100,
+        "boltzmann_vel": False,
+        "temp": None,
+        "seeds": None,
+        "num_cores": 1,
+    }
+
     flags = lines.split("%")
     if "" in flags:
         flags.remove("")
@@ -127,11 +136,23 @@ def parse_infile(inpath):
                 coeff.append(float(flag[state]))
             settings["coeff"] = np.array(coeff)
         elif arg == "t0":
-            settings["t0"] = flag[1]
+            settings["t0"] = float(flag[1])
         elif arg == "state0":
-            settings["state0"] = flag[1]
+            settings["state0"] = int(flag[1])
+        elif arg == "num_particles":
+            b_settings["num_particles"] = int(flag[1])
+        elif arg == "boltzmann_vel":
+            b_settings["boltzmann_vel"] = bool(flag[1])
+        elif arg == "temp":
+            b_settings["temp"] = float(flag[1])
+        elif arg == "num_cores":
+            b_settings["num_cores"] = int(flag[1])
+        elif arg == "seeds":
+            pass
+        else:
+            raise ValueError(f"Unrecognized flag '{arg}'")
 
-    return settings
+    return settings, b_settings
 
 
 def check_settings(settings):
@@ -191,10 +212,16 @@ def check_settings(settings):
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
     parser.add_argument("infile", type=str, help="input file for batch job")
+    parser.add_argument("outfile", type=str, help="output file for batch job")
+    parser.add_argument("outfolder", type=str, help="dir for verbose output")
     args = parser.parse_args()
 
     try:
-        settings = parse_infile(args.infile)
-        print(settings)
+        settings, bs = parse_infile(args.infile)
+        settings = check_settings(settings)
+        bat = batch.New_Batch(settings, lambda _: _)
+        num_particles = bs["num_particles"]
+        del bs["num_particles"]
+        bat.run(num_particles, args.outfile, args.outfolder, **bs)
     except FileNotFoundError:
         print(f"Error, infile '{args.infile}' not found")
