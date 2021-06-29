@@ -202,35 +202,25 @@ class New_Batch():
             else:
                 v = np.zeros((num_particles, self.dim)) + self.v0
 
-            num_loops = int(num_particles/num_cores)
-
-            for i in range(num_loops):
-                if num_cores > 1:
-                    pool = Pool()
-                    results = []
-                    # Run async
-                    for j in range(num_cores):
-                        index = (i*num_cores) + j
-                        temp = f"{index}.tmp"
-                        args = [index, v[index], temp,
-                                seeds[index], verbose, outfolder]
-                        results.append(pool.apply_async(self.run_traj, args))
-
-                    # Wait until all are done
-                    for j in range(num_cores):
-                        results[j].get()
-
-                    # Collate temp files into main outfile
-                    for j in range(num_cores):
-                        index = (i*num_cores) + j
-                        temp = f"{index}.tmp"
-                        with open(outfile, 'a') as out, open(f"{index}.tmp", "r") as infile:
-                            out.writelines(infile.readlines())
-                        os.remove(temp)
-
-                else:
+            # Run serialized if num_cores == 1
+            if num_cores == 1:
+                for i in range(num_particles):
                     self.run_traj(
-                        index, v[index], outfile, seed=seeds[index], verbose=verbose, outfolder=outfolder)
+                        i, v[i], outfile, seed=seeds[i], verbose=verbose, outfolder=outfolder)
+            else:
+                args = []
+                for i in range(num_particles):
+                    args.append((i, v[i], f"{i}.tmp",
+                                seeds[i], verbose, outfolder))
+                with Pool(num_cores) as pool:
+                    results = pool.starmap_async(self.run_traj, args)
+                    results.get()
+
+                for i in range(num_particles):
+                    temp = f"{i}.tmp"
+                    with open(outfile, "a") as out, open(temp, "r") as infile:
+                        out.writelines(infile.readlines())
+                    os.remove(temp)
 
         except Exception as e:
             print(e.__traceback__.tb_lineno)
