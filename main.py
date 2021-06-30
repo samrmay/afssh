@@ -140,7 +140,16 @@ def parse_infile(inpath):
         elif arg == "t0":
             settings["t0"] = float(flag[1])
         elif arg == "state0":
-            settings["state0"] = int(flag[1])
+            states = []
+            for j in range(1, len(flag) - 1):
+                if flag[j] == "end":
+                    break
+                states.append(int(flag[j]))
+            if len(states) == 1:
+                states = state[0]
+            else:
+                states = np.array(states)
+            settings["state0"] = states
 
         elif arg == "num_particles":
             b_settings["num_particles"] = int(flag[1])
@@ -194,8 +203,14 @@ def check_settings(settings):
             settings["coeff"] = np.concatenate(
                 coeff, np.zeros(num_states - len(coeff)))
 
-    settings["state0"] = min(settings["state0"], num_states-1)
-    settings["state0"] = max(settings["state0"], 0)
+    states = settings["state0"]
+    if not hasattr(states, "__len__"):
+        settings["state0"] = min(states, num_states-1)
+        settings["state0"] = max(settings["state0"], 0)
+    else:
+        if len(states) < num_particles:
+            settings["state0"] = np.concatenate(
+                states, np.zeros(num_particles - len(states)))
 
     # Check decoherence
     deco = settings["deco"]
@@ -230,6 +245,7 @@ if __name__ == "__main__":
     try:
         settings, bs = parse_infile(args.infile)
         settings = check_settings(settings)
+        print("Job initialized, starting trajectories")
         bat = batch.New_Batch(settings, fcns.reached_ground)
         num_particles = bs["num_particles"]
         del bs["num_particles"]
