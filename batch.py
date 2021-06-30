@@ -6,6 +6,7 @@ import math as math
 import boltzmann_sampling as sampling
 from multiprocessing import Pool
 import os
+import sys
 
 
 class Batch:
@@ -186,10 +187,23 @@ class New_Batch():
         self.num_particles = num_particles
         self.boltzmann_vel = boltzmann_vel
         self.temp = temp
+
+        # Initialize settings arrays
         if seeds == None:
             seeds = [None] * num_particles
         elif len(seeds) < num_particles:
             seeds += [None] * (num_particles - len(seeds))
+
+        if boltzmann_vel:
+            v = sampling.v_sample(temp, self.m, (num_particles, self.dim))
+        else:
+            v = np.zeros((num_particles, self.dim)) + self.v0
+
+        if not hasattr(self.state0, "__len__"):
+            self.state0 = np.array([self.state0] * num_particles)
+        elif len(self.state0) < num_particles:
+            raise ValueError(
+                "Not enough initial states (if you'd like constant initial states, pass in an integer")
 
         with open(outfile, "w") as f:
             self.write_heading(f)
@@ -197,10 +211,6 @@ class New_Batch():
         try:
             self.batch_state = "finished"
             self.start_time = time.time()
-            if boltzmann_vel:
-                v = sampling.v_sample(temp, self.m, (num_particles, self.dim))
-            else:
-                v = np.zeros((num_particles, self.dim)) + self.v0
 
             # Run serialized if num_cores == 1
             if num_cores == 1:
@@ -285,11 +295,14 @@ class New_Batch():
             f.write(",")
             np.savetxt(f, fssh.coeff, newline="|")
             f.write(f",{fssh.lam}\n")
+            sys.stdout.flush()
+            sys.stderr.flush()
 
     def log_trajectory(self, fssh, f, i, traj_time):
         lines = []
         lines.append(str(i) + "\n")
         lines.append(f"Start velocity: {fssh.v0}\n")
+        lines.append(f"Start PES: {self.state0[i]}\n")
         lines.append(f"End position: {fssh.r}\n")
         lines.append(f"End velocity: {fssh.v}\n")
         lines.append(f"End coefficients: {fssh.coeff}\n")
@@ -315,7 +328,7 @@ class New_Batch():
         t_start = time.time()
         print(i)
         x = fssh.AFSSH(self.model, self.r0, v, self.dt_c, self.e_tol, self.coeff,
-                       self.m, self.t0, self.state0, self.deco, self.langevin, seed)
+                       self.m, self.t0, self.state0[i], self.deco, self.langevin, seed)
         if verbose:
             with open(outfolder + f"/{i}.csv", 'w') as f:
                 def callback(fssh): return self.log_step(fssh, f)
@@ -327,3 +340,5 @@ class New_Batch():
         t_end = time.time()
         with open(outfile, 'a') as f:
             self.log_trajectory(x, f, i, t_end-t_start)
+            sys.stdout.flush()
+            sys.stderr.flush()
