@@ -549,7 +549,7 @@ class AFSSH():
                 self.step(int(self.dt_c/2))
             callback(self)
             if (debug and i % 100 == 0):
-                print(self.r, self.v, self.calc_KE(self.v))
+                print(self.r, self.v, self.calc_KE(self.v), self.lam, self.t)
 
             if stopping_fcn(self):
                 return
