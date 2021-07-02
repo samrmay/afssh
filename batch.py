@@ -183,7 +183,7 @@ class New_Batch():
         self.start_time = None
         self.end_time = None
 
-    def run(self, num_particles, outfile, outfolder, num_cores=1, boltzmann_vel=False, temp=None, verbose=False, seeds=None):
+    def run(self, num_particles, outfile, outfolder, working_dir, num_cores=1, boltzmann_vel=False, temp=None, verbose=False, seeds=None):
         self.num_particles = num_particles
         self.boltzmann_vel = boltzmann_vel
         self.temp = temp
@@ -220,14 +220,14 @@ class New_Batch():
             else:
                 args = []
                 for i in range(num_particles):
-                    args.append((i, v[i], f"{i}.tmp",
+                    args.append((i, v[i], os.path.join(working_dir, f"{i}.tmp"),
                                 seeds[i], verbose, outfolder))
-                with Pool(num_cores) as pool:
+                with Pool(processes=num_cores) as pool:
                     results = pool.starmap_async(self.run_traj, args)
-                    results.get()
+                    results.wait()
 
                 for i in range(num_particles):
-                    temp = f"{i}.tmp"
+                    temp = os.path.join(working_dir, f"{i}.tmp")
                     with open(outfile, "a") as out, open(temp, "r") as infile:
                         out.writelines(infile.readlines())
                     os.remove(temp)
@@ -288,7 +288,7 @@ class New_Batch():
         f.writelines(lines)
 
     def log_step(self, fssh, f):
-        if fssh.i % 25 == 0:
+        if fssh.i % 20 == 0:
             np.savetxt(f, fssh.r, newline="|")
             f.write(",")
             np.savetxt(f, fssh.v, newline="|")
