@@ -4,6 +4,8 @@ import argparse
 import re
 import numpy as np
 import stopping_functions as fcns
+import os.path as path
+import os
 
 
 def parse_infile(inpath):
@@ -135,7 +137,7 @@ def parse_infile(inpath):
             for state in range(1, len(flag) - 1):
                 if flag[dim] == "end":
                     break
-                coeff.append(float(flag[state]))
+                coeff.append(complex(flag[state]))
             settings["coeff"] = np.array(coeff, dtype=complex)
         elif arg == "t0":
             settings["t0"] = float(flag[1])
@@ -146,7 +148,7 @@ def parse_infile(inpath):
                     break
                 states.append(int(flag[j]))
             if len(states) == 1:
-                states = state[0]
+                states = states[0]
             else:
                 states = np.array(states)
             settings["state0"] = states
@@ -196,7 +198,7 @@ def check_settings(settings):
     # Check coeff and state0
     num_states = m.num_states
     coeff = settings["coeff"]
-    if coeff != None:
+    if coeff is not None:
         if len(coeff) > num_states:
             settings["coeff"] = coeff[:num_states]
         elif len(coeff) < num_states:
@@ -207,10 +209,6 @@ def check_settings(settings):
     if not hasattr(states, "__len__"):
         settings["state0"] = min(states, num_states-1)
         settings["state0"] = max(settings["state0"], 0)
-    else:
-        if len(states) < num_particles:
-            settings["state0"] = np.concatenate(
-                states, np.zeros(num_particles - len(states)))
 
     # Check decoherence
     deco = settings["deco"]
@@ -237,18 +235,28 @@ def check_settings(settings):
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
+    parser.add_argument("working_dir", type=str,
+                        help="working directory of batch job")
     parser.add_argument("infile", type=str, help="input file for batch job")
-    parser.add_argument("outfile", type=str, help="output file for batch job")
-    parser.add_argument("outfolder", type=str, help="dir for verbose output")
     args = parser.parse_args()
 
     try:
-        settings, bs = parse_infile(args.infile)
+        # Prepare directory/file environment
+        working_dir = args.working_dir
+        infile_path = path.join(working_dir, args.infile)
+        outfile_path = path.join(
+            working_dir, args.infile.split(".")[0] + '.out')
+        outfolder_path = path.join(working_dir, "verbose/")
+
+        if not path.isdir(outfolder_path):
+            os.mkdir(outfolder_path)
+
+        settings, bs = parse_infile(infile_path)
         settings = check_settings(settings)
         print("Job initialized, starting trajectories")
         bat = batch.New_Batch(settings, fcns.reached_ground)
         num_particles = bs["num_particles"]
         del bs["num_particles"]
-        bat.run(num_particles, args.outfile, args.outfolder, **bs)
+        bat.run(num_particles, outfile_path, outfolder_path, working_dir, **bs)
     except FileNotFoundError:
-        print(f"Error, infile '{args.infile}' not found")
+        print(f"Error, infile '{infile_path}' not found")
