@@ -206,7 +206,7 @@ class Coupled_Osc2d(Diabatic_Model):
 
 
 class NState_Spin_Boson(Diabatic_Model):
-    def __init__(self, omega=3.5e-4, er=2.39e-2, e0=1.5e-2, coup=1.49e-5, mass=2000, l_states=1, r_states=1):
+    def __init__(self, omega=3.5e-4, er=2.39e-2, e0=1.5e-2, coup=1.49e-5, mass=2000, l_states=1, r_states=1, d=1.5e-2):
         self.omega = omega
         self.Er = er
         self.E0 = e0
@@ -217,7 +217,7 @@ class NState_Spin_Boson(Diabatic_Model):
         self.l_states = int(l_states)
         self.r_states = int(l_states)
         self.num_states = int(l_states + r_states)
-        self.d = e0
+        self.d = d
 
         super().__init__(self.num_states)
 
@@ -242,7 +242,7 @@ def plot_1d(ax, model, x_linspace):
         potentials[i] = model.get_adiabatic_energy(x)
 
     for i in range(model.num_states):
-        ax.plot(x_linspace, potentials[:, i])
+        ax.plot(x_linspace, potentials[:, i], "--")
 
 
 def plot_1d_coupling(ax, model, x_linspace, coupling_scaling_factor):
