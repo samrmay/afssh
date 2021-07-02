@@ -67,7 +67,7 @@ class AFSSH():
         if state0 >= self.num_states:
             raise ValueError(
                 "ground state must be less than total number of states")
-        if coeff == None:
+        if coeff is None:
             self.coeff = np.zeros(self.num_states, dtype=complex)
             self.coeff[state0] = 1
         else:
