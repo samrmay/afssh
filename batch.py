@@ -158,6 +158,63 @@ class Batch:
                 f.write(f"{state[0]},{state[1]},{state[2]},{state[4]}\n")
 
 
+def log_trajectory(fssh, f, i, traj_time):
+    lines = []
+    lines.append(str(i) + "\n")
+    lines.append(f"Start velocity: {fssh.v0}\n")
+    lines.append(f"Start PES: {fssh.state0}\n")
+    lines.append(f"End position: {fssh.r}\n")
+    lines.append(f"End velocity: {fssh.v}\n")
+    lines.append(f"End coefficients: {fssh.coeff}\n")
+    lines.append(f"End KE: {fssh.calc_KE(fssh.v)}\n")
+    lines.append(f"End state: {fssh.lam}\n")
+    lines.append(f"End time: {fssh.t}\n")
+    lines.append(f"Seed: {fssh.seed}\n")
+    lines.append(
+        f"Time to end: {traj_time} seconds\n")
+    lines.append("===State switches===\n")
+    for s in fssh.switches:
+        lines.append(f"old_state: {s.get('old_state')}, ")
+        lines.append(f"new_state: {s.get('new_state')}, ")
+        lines.append(f"position: {s.get('position')}, ")
+        lines.append(f"velocity: {s.get('velocity')}, ")
+        lines.append(f"coefficients: {s.get('coefficients')}, ")
+        lines.append(f"delta_v: {s.get('delta_v')}, ")
+        lines.append(f"success: {s.get('success')}\n")
+    lines.append("===End state switches===\n")
+    f.writelines(lines)
+
+
+def log_step(fssh, f):
+    if fssh.i % 20 == 0:
+        np.savetxt(f, fssh.r, newline="|")
+        f.write(",")
+        np.savetxt(f, fssh.v, newline="|")
+        f.write(",")
+        np.savetxt(f, fssh.coeff, newline="|")
+        f.write(f",{fssh.lam}\n")
+        sys.stdout.flush()
+        sys.stderr.flush()
+
+
+def run_traj(i, x, outfile, max_iter, stopping_fcn, debug, verbose=False, outfolder=None):
+    t_start = time.time()
+    print(i)
+    if verbose:
+        with open(outfolder + f"/{i}.csv", 'w') as f:
+            def callback(fssh): return log_step(fssh, f)
+            x.run(max_iter, stopping_fcn,
+                  debug, callback)
+    else:
+        x.run(max_iter, stopping_fcn, debug)
+
+    t_end = time.time()
+    with open(outfile, 'a') as f:
+        log_trajectory(x, f, i, t_end-t_start)
+        sys.stdout.flush()
+        sys.stderr.flush()
+
+
 class New_Batch():
     def __init__(self, fssh_settings, stopping_fcn):
         self.model = fssh_settings.get("model")
@@ -215,16 +272,20 @@ class New_Batch():
             # Run serialized if num_cores == 1
             if num_cores == 1:
                 for i in range(num_particles):
-                    self.run_traj(
-                        i, v[i], outfile, seed=seeds[i], verbose=verbose, outfolder=outfolder)
+                    x = fssh.AFSSH(self.model, self.r0, v[i], self.dt_c, self.e_tol, self.coeff,
+                                   self.m, self.t0, self.state0[i], self.deco, self.langevin, seeds[i])
+                    run_traj(i, x, outfile, self.max_iter,
+                             self.stopping_fcn, self.debug, verbose, outfolder)
             else:
                 args = []
                 for i in range(num_particles):
-                    args.append((i, v[i], os.path.join(working_dir, f"{i}.tmp"),
-                                seeds[i], verbose, outfolder))
+                    x = fssh.AFSSH(self.model, self.r0, v[i], self.dt_c, self.e_tol, self.coeff,
+                                   self.m, self.t0, self.state0[i], self.deco, self.langevin, seeds[i])
+                    args.append((i, x, os.path.join(
+                        working_dir, f"{i}.tmp"), self.max_iter, self.stopping_fcn, self.debug, verbose, outfolder))
                 with Pool(processes=num_cores) as pool:
-                    results = pool.starmap_async(self.run_traj, args)
-                    results.wait()
+                    results = pool.starmap_async(run_traj, args)
+                    results.get()
 
                 for i in range(num_particles):
                     temp = os.path.join(working_dir, f"{i}.tmp")
@@ -286,59 +347,3 @@ class New_Batch():
 
         lines.append(("-"*10) + "Job results" + ("-"*10) + '\n')
         f.writelines(lines)
-
-    def log_step(self, fssh, f):
-        if fssh.i % 20 == 0:
-            np.savetxt(f, fssh.r, newline="|")
-            f.write(",")
-            np.savetxt(f, fssh.v, newline="|")
-            f.write(",")
-            np.savetxt(f, fssh.coeff, newline="|")
-            f.write(f",{fssh.lam}\n")
-            sys.stdout.flush()
-            sys.stderr.flush()
-
-    def log_trajectory(self, fssh, f, i, traj_time):
-        lines = []
-        lines.append(str(i) + "\n")
-        lines.append(f"Start velocity: {fssh.v0}\n")
-        lines.append(f"Start PES: {self.state0[i]}\n")
-        lines.append(f"End position: {fssh.r}\n")
-        lines.append(f"End velocity: {fssh.v}\n")
-        lines.append(f"End coefficients: {fssh.coeff}\n")
-        lines.append(f"End KE: {fssh.calc_KE(fssh.v)}\n")
-        lines.append(f"End state: {fssh.lam}\n")
-        lines.append(f"End time: {fssh.t}\n")
-        lines.append(f"Seed: {fssh.seed}\n")
-        lines.append(
-            f"Time to end: {traj_time} seconds\n")
-        lines.append("===State switches===\n")
-        for s in fssh.switches:
-            lines.append(f"old_state: {s.get('old_state')}, ")
-            lines.append(f"new_state: {s.get('new_state')}, ")
-            lines.append(f"position: {s.get('position')}, ")
-            lines.append(f"velocity: {s.get('velocity')}, ")
-            lines.append(f"coefficients: {s.get('coefficients')}, ")
-            lines.append(f"delta_v: {s.get('delta_v')}, ")
-            lines.append(f"success: {s.get('success')}\n")
-        lines.append("===End state switches===\n")
-        f.writelines(lines)
-
-    def run_traj(self, i, v, outfile, seed=None, verbose=False, outfolder=None):
-        t_start = time.time()
-        print(i)
-        x = fssh.AFSSH(self.model, self.r0, v, self.dt_c, self.e_tol, self.coeff,
-                       self.m, self.t0, self.state0[i], self.deco, self.langevin, seed)
-        if verbose:
-            with open(outfolder + f"/{i}.csv", 'w') as f:
-                def callback(fssh): return self.log_step(fssh, f)
-                x.run(self.max_iter, self.stopping_fcn,
-                      self.debug, callback)
-        else:
-            x.run(self.max_iter, self.stopping_fcn, self.debug)
-
-        t_end = time.time()
-        with open(outfile, 'a') as f:
-            self.log_trajectory(x, f, i, t_end-t_start)
-            sys.stdout.flush()
-            sys.stderr.flush()
