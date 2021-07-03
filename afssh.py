@@ -64,6 +64,7 @@ class AFSSH():
         # Initialize electronic state
         self.num_states = model.num_states
         self.lam = state0
+        self.state0 = state0
         if state0 >= self.num_states:
             raise ValueError(
                 "ground state must be less than total number of states")
