@@ -254,7 +254,7 @@ if __name__ == "__main__":
         settings, bs = parse_infile(infile_path)
         settings = check_settings(settings)
         print("Job initialized, starting trajectories")
-        bat = batch.New_Batch(settings, fcns.reached_ground)
+        bat = batch.New_Batch(settings, fcns.no_stop)
         num_particles = bs["num_particles"]
         del bs["num_particles"]
         bat.run(num_particles, outfile_path, outfolder_path, working_dir, **bs)
