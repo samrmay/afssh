@@ -215,7 +215,7 @@ class NState_Spin_Boson(Diabatic_Model):
         self.M = np.sqrt(self.Er*self.mass*(self.omega**2)/2)
 
         self.l_states = int(l_states)
-        self.r_states = int(l_states)
+        self.r_states = int(r_states)
         self.num_states = int(l_states + r_states)
         self.d = d
 
