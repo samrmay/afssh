@@ -211,17 +211,31 @@ def combine_tmp(d, outfile):
             out.writelines(infile.readlines())
 
 
+def del_tmp(d):
+    filenames = [f for f in os.listdir(d) if f.endswith(".tmp")]
+    for filename in filenames:
+        os.remove(os.path.join(d, filename))
+
+
+def prepare_unfinished_job(d, out):
+    filter_finished(d)
+    combine_tmp(d, out)
+    del_tmp(d)
+
+# prepare_unfinished_job(
+#     "results/070821_Nstate_high_density/", "070821_high_d.out")
 # outfile_analysis("results/Nstate_063021/063021.out")
+# time_spent("./results/Nstate_063021/verbose/")
 
 
 fig, ax = plt.subplots()
+ax.set_xlabel("Nuclear coordinate (au)")
+ax.set_ylabel("Potential (Eh)")
+# ax.set_title("iter=12500, damp=.0001, T=298")
 x = np.linspace(-20, 20, 1000)
 model = m.NState_Spin_Boson(l_states=10, r_states=10)
-m.plot_1d(ax, model, x)
-avg_trajectories(ax, model, "results/070321_Nstate/verbose/")
-# plt.show()
+m.plot_diabats_1d(ax, model, x)
+avg_trajectories(ax, model, "results/070621_long_test/verbose/")
 
-# time_spent("./results/Nstate_063021/verbose/")
-
-plot_end_pos("results/070321_Nstate/070321_1.out", model, ax)
+plot_end_pos("results/070621_long_test/070621.out", model, ax)
 plt.show()

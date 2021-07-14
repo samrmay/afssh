@@ -10,7 +10,7 @@ f = fcns.basic_1d(-10, 10)
 def animate_1d(fssh, fig, ax, stopping_function=f, min_x=-10, max_x=10, interval=.5, num_points=400):
     x_linspace = np.linspace(min_x, max_x, num_points)
     model = fssh.model
-    models.plot_1d(ax, model, x_linspace)
+    models.plot_diabats_1d(ax, model, x_linspace)
 
     U = model.get_adiabatic_energy(fssh.r[0])[fssh.lam]
     v = fssh.v[0]

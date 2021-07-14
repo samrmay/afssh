@@ -516,7 +516,7 @@ class AFSSH():
                 self.log_switch(self.lam, new_PES, r, v, c, diff)
                 self.lam = new_PES
 
-        # Decoherence calculations (if applicable)
+        # Decoherence calculations (if applicable) **Still not working**
         if self.deco:
             # Evolve moments
             torque0 = self.calc_torque(r0)
